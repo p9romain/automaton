@@ -31,13 +31,13 @@ module type S = sig
   val add_start : t -> st -> t
   val add_end : t -> st -> t
 
-  (* val remove_state : t -> st -> t
+  val remove_state : t -> st -> t
   val remove_one_trans : t -> st -> lt -> st -> t
   val remove_all_trans : t -> st -> lt -> t
   val remove_start : t -> st -> t
   val remove_end : t -> st -> t
 
-  val clear : t -> t
+  (* val clear : t -> t
 
 
   val is_deterministic : t -> bool
@@ -91,28 +91,83 @@ module Make (Lt : OrderedEmptyType) (St : OrderedType) : S with type lt = Lt.t a
 
 
   let add_state (auto : t) 
-                (s : st) : t =
-    { auto with states = s :: auto.states }
+                (state : st) : t =
+    match List.find_opt (fun s -> St.compare s state = 0) auto.states with
+    | None -> { auto with states = state :: auto.states }
+    | Some _ -> auto
 
   let add_trans (auto : t) 
-                (s1 : st) 
+                (state1 : st) 
                 (letter : lt )
-                (s2 : st) : t =
+                (state2 : st) : t =
     let transitions =
       begin
-        match Trans.find_opt (s1, letter) auto.trans with
-        | None -> Trans.add (s1, letter) [ s2 ] auto.trans
-        | Some stl -> Trans.add (s1, letter) (s2 :: stl) auto.trans
+        match Trans.find_opt (state1, letter) auto.trans with
+        | None -> Trans.add (state1, letter) [ state2 ] auto.trans
+        | Some state_list -> Trans.add (state1, letter) (state2 :: state_list) auto.trans
       end
     in
     { auto with trans = transitions }
 
   let add_start (auto : t) 
-                (s : st) : t =
-    { auto with starts = s :: auto.starts }
+                (state : st) : t =
+    match List.find_opt (fun s -> St.compare s state = 0) auto.starts with
+    | None -> { auto with starts = state :: auto.starts }
+    | Some _ -> auto
 
   let add_end (auto : t) 
-              (s : st) : t =
-    { auto with ends = s :: auto.ends }
+              (state : st) : t =
+    match List.find_opt (fun s -> St.compare s state = 0) auto.ends with
+    | None -> { auto with ends = state :: auto.ends }
+    | Some _ -> auto
+
+
+
+  let rec remove_first_state_from_list (l : st list)
+                                 (elt : st) : st list =
+    match l with
+    | [] -> []
+    | e :: l' ->
+      if St.compare elt e = 0 then
+        l'
+      else
+        e :: remove_first_state_from_list l' elt
+
+  let remove_state (auto : t) 
+                   (state : st) : t =
+    { auto with states = remove_first_state_from_list auto.states state }
+
+  let remove_one_trans (auto : t) 
+                       (state1 : st) 
+                       (letter : lt) 
+                       (state2 : st) : t =
+    let transitions =
+      begin
+        match Trans.find_opt (state1, letter) auto.trans with
+        | None -> auto.trans
+        | Some state_list ->
+          begin
+            match remove_first_state_from_list state_list state2 with
+            | [] -> Trans.remove (state1, letter) auto.trans
+            | state_list -> Trans.add (state1, letter) state_list auto.trans
+          end
+      end
+    in
+    { auto with trans = transitions }
+
+  let remove_all_trans (auto : t) 
+                       (state : st) 
+                       (letter : lt) : t =
+    let transitions = Trans.remove (state, letter) auto.trans
+    in
+    { auto with trans = transitions }
+
+  let remove_start (auto : t) 
+                   (state : st) : t =
+    { auto with starts = remove_first_state_from_list auto.starts state }
+
+  let remove_end (auto : t) 
+                 (state : st) : t =
+    { auto with ends = remove_first_state_from_list auto.ends state }
 
 end

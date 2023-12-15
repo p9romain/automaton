@@ -33,13 +33,13 @@ module type S = sig
   val add_start : t -> st -> t
   val add_end : t -> st -> t
 
-  (* val remove_state : t -> st -> t
+  val remove_state : t -> st -> t
   val remove_one_trans : t -> st -> lt -> st -> t
   val remove_all_trans : t -> st -> lt -> t
   val remove_start : t -> st -> t
   val remove_end : t -> st -> t
 
-  val clear : t -> t
+  (* val clear : t -> t
 
 
   val is_deterministic : t -> bool
