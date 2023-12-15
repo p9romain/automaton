@@ -39,18 +39,15 @@ module type S = sig
   val remove_start : t -> st -> t
   val remove_end : t -> st -> t
 
-  (* val clear : t -> t
-
-
   val is_deterministic : t -> bool
-  val determinize : t -> t
+  (* val determinize : t -> t *)
   
-  val check_word : t -> lt Seq.t -> bool
+  (* val check_word : t -> lt Seq.t -> bool *)
 
-  val to_regex : t -> string
-  val from_regex : string -> t
+  (* val to_regex : t -> string *)
+  (* val from_regex : string -> t *)
 
-  val to_dot : t -> string -> unit *)
+  (* val to_dot : t -> string -> unit *)
 
 end
 

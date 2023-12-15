@@ -37,18 +37,15 @@ module type S = sig
   val remove_start : t -> st -> t
   val remove_end : t -> st -> t
 
-  (* val clear : t -> t
-
-
   val is_deterministic : t -> bool
-  val determinize : t -> t
+  (* val determinize : t -> t *)
   
-  val check_word : t -> lt Seq.t -> bool
+  (* val check_word : t -> lt Seq.t -> bool *)
 
-  val to_regex : t -> string
-  val from_regex : string -> t 
+  (* val to_regex : t -> string *)
+  (* val from_regex : string -> t *)
 
-  val to_dot : t -> string -> unit *)
+  (* val to_dot : t -> string -> unit *)
 
 end
 
@@ -169,5 +166,18 @@ module Make (Lt : OrderedEmptyType) (St : OrderedType) : S with type lt = Lt.t a
   let remove_end (auto : t) 
                  (state : st) : t =
     { auto with ends = remove_first_state_from_list auto.ends state }
+
+
+
+  let is_deterministic (auto : t) : bool =
+    let aux =
+      fun (_, letter) 
+          states 
+          acc -> not (Lt.is_empty letter) (* No epsilon transitions *)
+                 && List.length states = 1  (* Only one transition of letter [letter] between two states *)
+                 && acc
+    in
+    List.length auto.starts = 1 (* Only one start state *)
+    && Trans.fold aux auto.trans true
 
 end
