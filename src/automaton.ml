@@ -1,16 +1,20 @@
-module type OrderedType = sig
+module type OrderedPrintableType = sig
 
   type t
 
   val compare : t -> t -> int
+
+  val to_string : t -> string
 
 end
 
-module type OrderedEmptyType = sig
+module type OrderedEmptyPrintableType = sig
 
   type t
 
   val compare : t -> t -> int
+
+  val to_string : t -> string
 
   val empty : t
   val is_empty : t -> bool
@@ -45,11 +49,11 @@ module type S = sig
   (* val to_regex : t -> string *)
   (* val from_regex : string -> t *)
 
-  (* val to_dot : t -> string -> unit *)
+  val to_dot : t -> string -> unit
 
 end
 
-module Make (Lt : OrderedEmptyType) (St : OrderedType) : S with type lt = Lt.t and type st = St.t = struct
+module Make (Lt : OrderedEmptyPrintableType) (St : OrderedPrintableType) : S with type lt = Lt.t and type st = St.t = struct
 
   type lt = Lt.t
   type st = St.t
@@ -179,5 +183,25 @@ module Make (Lt : OrderedEmptyType) (St : OrderedType) : S with type lt = Lt.t a
     in
     List.length auto.starts = 1 (* Only one start state *)
     && Trans.fold aux auto.trans true
+
+
+
+  let to_dot (auto : t)
+             (file_name : string) : unit =
+    let file = open_out file_name in
+    Printf.fprintf file "digraph automaton\n{\n" ;
+    Trans.iter 
+      (
+        fun (state1, letter) states -> 
+          List.iter 
+            (
+              fun state2 -> 
+                Printf.fprintf file "  %s -> %s [label=%s] ;\n" (St.to_string state1) (Lt.to_string letter) (St.to_string state2)
+            ) 
+            states
+      ) 
+      auto.trans ;
+    Printf.fprintf file "}" ;
+    close_out file ;
 
 end

@@ -4,6 +4,8 @@ module Letter = struct
 
   let compare c1 c2 = String.compare c1 c2
 
+  let to_string s = s
+
   let empty = ""
   let is_empty c = (String.compare c empty) = 0
 

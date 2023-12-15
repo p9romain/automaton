@@ -1,18 +1,22 @@
 (* For the states *)
-module type OrderedType = sig
+module type OrderedPrintableType = sig
 
   type t
 
   val compare : t -> t -> int
+
+  val to_string : t -> string
 
 end
 
 (* For the alphabet (with empty letter !) *)
-module type OrderedEmptyType = sig
+module type OrderedEmptyPrintableType = sig
 
   type t
 
   val compare : t -> t -> int
+
+  val to_string : t -> string
 
   val empty : t
   val is_empty : t -> bool
@@ -47,8 +51,8 @@ module type S = sig
   (* val to_regex : t -> string *)
   (* val from_regex : string -> t *)
 
-  (* val to_dot : t -> string -> unit *)
+  val to_dot : t -> string -> unit
 
 end
 
-module Make (Lt : OrderedEmptyType) (St : OrderedType) : S with type lt = Lt.t and type st = St.t
+module Make (Lt : OrderedEmptyPrintableType) (St : OrderedPrintableType) : S with type lt = Lt.t and type st = St.t
