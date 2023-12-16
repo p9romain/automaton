@@ -39,9 +39,11 @@ module type S = sig
 
   val remove_state : t -> st -> t
   val remove_one_trans : t -> st -> lt -> st -> t
-  val remove_all_trans : t -> st -> lt -> t
+  val remove_all_trans : t -> st -> st -> t
   val remove_start : t -> st -> t
   val remove_end : t -> st -> t
+
+  val replace_trans : t -> st -> lt -> st -> t
 
   val is_deterministic : t -> bool
   (* val determinize : t -> t *)

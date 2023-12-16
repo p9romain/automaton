@@ -37,9 +37,11 @@ module type S = sig
 
   val remove_state : t -> st -> t
   val remove_one_trans : t -> st -> lt -> st -> t
-  val remove_all_trans : t -> st -> lt -> t
+  val remove_all_trans : t -> st -> st -> t
   val remove_start : t -> st -> t
   val remove_end : t -> st -> t
+
+  val replace_trans : t -> st -> lt -> st -> t
 
   val is_deterministic : t -> bool
   (* val determinize : t -> t *)
@@ -60,11 +62,11 @@ module Make (Lt : OrderedEmptyPrintableType) (St : OrderedPrintableType) : S wit
   let eps : lt = Lt.empty   
 
   module StateLetter = struct
-    type t = st * lt
+    type t = st * st
 
-    let compare (s1, l1) (s2, l2) =
-      match compare s1 s2 with
-      | 0 -> compare l1 l2
+    let compare (s1, s1') (s2, s2') =
+      match St.compare s1 s2 with
+      | 0 -> St.compare s1' s2'
       | c -> c
   end
   module Trans = Map.Make(StateLetter)
@@ -73,7 +75,7 @@ module Make (Lt : OrderedEmptyPrintableType) (St : OrderedPrintableType) : S wit
               alphabet : lt list ; 
               states : st list ; 
               starts : st list ; 
-              trans : (st list) Trans.t ; 
+              trans : (lt list) Trans.t ; 
               ends : st list
            }        
 
@@ -99,13 +101,17 @@ module Make (Lt : OrderedEmptyPrintableType) (St : OrderedPrintableType) : S wit
 
   let add_trans (auto : t) 
                 (state1 : st) 
-                (letter : lt )
+                (letter : lt)
                 (state2 : st) : t =
     let transitions =
       begin
-        match Trans.find_opt (state1, letter) auto.trans with
-        | None -> Trans.add (state1, letter) [ state2 ] auto.trans
-        | Some state_list -> Trans.add (state1, letter) (state2 :: state_list) auto.trans
+        match Trans.find_opt (state1, state2) auto.trans with
+        | None -> Trans.add (state1, state2) [ letter ] auto.trans
+        | Some letter_list -> 
+          if Lt.is_empty letter then
+            failwith "Trying to add ε over already existing transitions : cannot choose the outcome"
+          else
+            Trans.add (state1, state2) (letter :: letter_list) auto.trans
       end
     in
     { auto with trans = transitions }
@@ -144,22 +150,32 @@ module Make (Lt : OrderedEmptyPrintableType) (St : OrderedPrintableType) : S wit
                        (state2 : st) : t =
     let transitions =
       begin
-        match Trans.find_opt (state1, letter) auto.trans with
+        match Trans.find_opt (state1, state2) auto.trans with
         | None -> auto.trans
-        | Some state_list ->
+        | Some letter_list ->
           begin
-            match remove_first_state_from_list state_list state2 with
-            | [] -> Trans.remove (state1, letter) auto.trans
-            | state_list -> Trans.add (state1, letter) state_list auto.trans
+            let rec remove_first_letter_from_list (l : lt list)
+                                                  (elt : lt) : lt list =
+              match l with
+              | [] -> []
+              | e :: l' ->
+                if Lt.compare elt e = 0 then
+                  l'
+                else
+                  e :: remove_first_letter_from_list l' elt
+            in
+            match remove_first_letter_from_list letter_list letter with
+            | [] -> Trans.remove (state1, state2) auto.trans
+            | letter_list -> Trans.add (state1, state2) letter_list auto.trans
           end
       end
     in
     { auto with trans = transitions }
 
   let remove_all_trans (auto : t) 
-                       (state : st) 
-                       (letter : lt) : t =
-    let transitions = Trans.remove (state, letter) auto.trans
+                       (state1 : st) 
+                       (state2 : st) : t =
+    let transitions = Trans.remove (state1, state2) auto.trans
     in
     { auto with trans = transitions }
 
@@ -173,32 +189,54 @@ module Make (Lt : OrderedEmptyPrintableType) (St : OrderedPrintableType) : S wit
 
 
 
+  let replace_trans (auto : t) 
+                    (state1 : st) 
+                    (letter : lt) 
+                    (state2 : st) : t =  
+    add_trans (remove_all_trans auto state1 state2) state1 letter state2
+
+
+
   let is_deterministic (auto : t) : bool =
-    let aux =
-      fun (_, letter) 
-          states 
-          acc -> not (Lt.is_empty letter) (* No epsilon transitions *)
-                 && List.length states = 1  (* Only one transition of letter [letter] between two states *)
-                 && acc
-    in
     List.length auto.starts = 1 (* Only one start state *)
-    && Trans.fold aux auto.trans true
+    && Trans.fold (
+        fun _ letters acc -> 
+          let old_letter = ref eps in
+          List.fold_left (
+            fun acc' letter ->
+              (* Only one occ of letter (letters is sorted) *)
+              if Lt.compare !old_letter letter = 0 then
+                false
+              else
+                let () = old_letter := letter in
+                (* No epsilon transition *)
+                not (Lt.is_empty letter) && acc'
+            ) 
+            true (List.sort Lt.compare letters)
+          && acc
+        ) 
+        auto.trans true
 
 
 
   let to_dot (auto : t)
              (file_name : string) : unit =
-    let file = open_out file_name in
+    let file = open_out (file_name ^ ".dot") in
     Printf.fprintf file "digraph automaton\n{\n" ;
-    Trans.iter 
-      (
-        fun (state1, letter) states -> 
-          List.iter 
-            (
-              fun state2 -> 
-                Printf.fprintf file "  %s -> %s [label=%s] ;\n" (St.to_string state1) (Lt.to_string letter) (St.to_string state2)
-            ) 
-            states
+    List.iteri ( 
+      fun i state -> 
+        Printf.fprintf file "  __INVISIBLE_NODE_%d__ [label= \"\", shape=none,height=.0,width=.0]\n" i ;
+        Printf.fprintf file "  __INVISIBLE_NODE_%d__ -> %s [peripheries=2]\n" i (St.to_string state)
+      ) 
+      auto.starts ;
+    List.iter ( fun state -> Printf.fprintf file "  %s [peripheries=2]\n" (St.to_string state) ) auto.ends ;
+    Trans.iter (
+      fun (state1, state2) letters -> 
+        if List.fold_left (fun acc letter -> not (Lt.is_empty letter) && acc) true letters then
+          let letters = String.concat ", " (List.map Lt.to_string letters) in
+          Printf.fprintf file "  %s -> %s [label=\"%s\"] ;\n" (St.to_string state1) (St.to_string state2) letters
+        else
+          Printf.fprintf file "  %s -> %s [label=\"ε\"] ;\n" (St.to_string state1) (St.to_string state2)
       ) 
       auto.trans ;
     Printf.fprintf file "}" ;
