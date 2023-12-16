@@ -1,4 +1,4 @@
-module type OrderedPrintableType = sig
+module type State = sig
 
   type t
 
@@ -8,7 +8,7 @@ module type OrderedPrintableType = sig
 
 end
 
-module type OrderedEmptyPrintableType = sig
+module type Letter = sig
 
   type t
 
@@ -18,6 +18,8 @@ module type OrderedEmptyPrintableType = sig
 
   val empty : t
   val is_empty : t -> bool
+
+  val string_to_list : string -> t list
 
 end
 
@@ -46,7 +48,7 @@ module type S = sig
   val is_deterministic : t -> bool
   (* val determinize : t -> t *)
   
-  val check_word : t -> lt list -> bool
+  val check_word : t -> string -> bool
 
   (* val to_regex : t -> string *)
   (* val from_regex : string -> t *)
@@ -55,7 +57,7 @@ module type S = sig
 
 end
 
-module Make (Lt : OrderedEmptyPrintableType) (St : OrderedPrintableType) : S with type lt = Lt.t and type st = St.t = struct
+module Make (Lt : Letter) (St : State) : S with type lt = Lt.t and type st = St.t = struct
 
   type lt = Lt.t
   type st = St.t
@@ -261,7 +263,7 @@ module Make (Lt : OrderedEmptyPrintableType) (St : OrderedPrintableType) : S wit
 
 
   let check_word (auto : t)
-                 (word : lt list) : bool =
+                 (word : string) : bool =
     let rec graph_path (remaining_word : lt list)
                        (current_state : st) : bool =
       match remaining_word with
@@ -284,6 +286,7 @@ module Make (Lt : OrderedEmptyPrintableType) (St : OrderedPrintableType) : S wit
         end
     in 
     try
+      let word = Lt.string_to_list word in
       List.fold_left (fun acc first_state -> (graph_path word first_state) || acc) false auto.starts
     with _ -> true
 

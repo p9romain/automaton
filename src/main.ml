@@ -9,7 +9,7 @@ module Letter = struct
   let empty = ""
   let is_empty c = (String.compare c empty) = 0
 
-  let to_list s =
+  let string_to_list s =
     List.map (fun c -> Char.escaped c) @@ List.of_seq @@ String.to_seq s
 
 end
@@ -27,4 +27,4 @@ let test = A.add_trans test 2 "b" 3
 let test = A.add_trans test 3 "a" 4
 let () = A.to_dot test "test"
 let () = Printf.printf "%s\n" (if A.is_deterministic test then "true" else "false")
-let () = Printf.printf "%s\n" (if A.check_word test (Letter.to_list "aabbabbbabbabbabababbabababa") then "true" else "false")
+let () = Printf.printf "%s\n" (if A.check_word test "abbabba" then "true" else "false")

@@ -1,5 +1,5 @@
 (* For the states *)
-module type OrderedPrintableType = sig
+module type State = sig
 
   type t
 
@@ -10,7 +10,7 @@ module type OrderedPrintableType = sig
 end
 
 (* For the alphabet (with empty letter !) *)
-module type OrderedEmptyPrintableType = sig
+module type Letter = sig
 
   type t
 
@@ -20,6 +20,8 @@ module type OrderedEmptyPrintableType = sig
 
   val empty : t
   val is_empty : t -> bool
+
+  val string_to_list : string -> t list
 
 end
 
@@ -48,7 +50,7 @@ module type S = sig
   val is_deterministic : t -> bool
   (* val determinize : t -> t *)
   
-  val check_word : t -> lt list -> bool
+  val check_word : t -> string -> bool
 
   (* val to_regex : t -> string *)
   (* val from_regex : string -> t *)
@@ -57,4 +59,4 @@ module type S = sig
 
 end
 
-module Make (Lt : OrderedEmptyPrintableType) (St : OrderedPrintableType) : S with type lt = Lt.t and type st = St.t
+module Make (Lt : Letter) (St : State) : S with type lt = Lt.t and type st = St.t
