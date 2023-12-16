@@ -93,6 +93,17 @@ module Make (Lt : OrderedEmptyPrintableType) (St : OrderedPrintableType) : S wit
 
 
 
+  let rec is_there_empty (l : lt list) : bool =
+    match l with
+    | [] -> false
+    | e :: l ->
+      if Lt.compare e eps = 0 then
+        true
+      else
+        is_there_empty l
+
+
+
   let add_state (auto : t) 
                 (state : st) : t =
     match List.find_opt (fun s -> St.compare s state = 0) auto.states with
@@ -199,25 +210,38 @@ module Make (Lt : OrderedEmptyPrintableType) (St : OrderedPrintableType) : S wit
 
   let is_deterministic (auto : t) : bool =
     List.length auto.starts = 1 (* Only one start state *)
+    (* No epsilon transition *)
     && Trans.fold (
         fun _ letters acc -> 
-          let old_letter = ref eps in
-          List.fold_left (
-            fun acc' letter ->
-              (* Only one occ of letter (letters is sorted) *)
-              if Lt.compare !old_letter letter = 0 then
-                false
-              else
-                let () = old_letter := letter in
-                (* No epsilon transition *)
-                not (Lt.is_empty letter) && acc'
-            ) 
-            true (List.sort Lt.compare letters)
-          && acc
+          not (is_there_empty letters) && acc
         ) 
         auto.trans true
-
-
+    (* No same letter transition from a start state *)
+    && List.fold_left (
+        fun acc state1 -> 
+          (* All the transitions from state1 *)
+          let letter_list = List.fold_left (
+            fun acc' state2 ->
+              match Trans.find_opt (state1, state2) auto.trans with
+              | None -> acc'
+              | Some letter_list -> letter_list @ acc'
+            )
+            [] auto.states
+          in
+          (* Sorting to see if each letter is unique or not *)
+          let letter_list = List.sort Lt.compare letter_list in
+          let rec check l acc =
+            match l with
+            | [] -> true
+            | elt :: l ->
+              if Lt.compare elt acc = 0 then
+                false
+              else
+                check l elt
+          in
+          check letter_list eps && acc
+        ) 
+        true auto.states
 
   let to_dot (auto : t)
              (file_name : string) : unit =
@@ -232,11 +256,11 @@ module Make (Lt : OrderedEmptyPrintableType) (St : OrderedPrintableType) : S wit
     List.iter ( fun state -> Printf.fprintf file "  %s [peripheries=2]\n" (St.to_string state) ) auto.ends ;
     Trans.iter (
       fun (state1, state2) letters -> 
-        if List.fold_left (fun acc letter -> not (Lt.is_empty letter) && acc) true letters then
+        if is_there_empty letters then
+          Printf.fprintf file "  %s -> %s [label=\"ε\"] ;\n" (St.to_string state1) (St.to_string state2)
+        else
           let letters = String.concat ", " (List.map Lt.to_string letters) in
           Printf.fprintf file "  %s -> %s [label=\"%s\"] ;\n" (St.to_string state1) (St.to_string state2) letters
-        else
-          Printf.fprintf file "  %s -> %s [label=\"ε\"] ;\n" (St.to_string state1) (St.to_string state2)
       ) 
       auto.trans ;
     Printf.fprintf file "}" ;
