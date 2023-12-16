@@ -46,7 +46,7 @@ module type S = sig
   val is_deterministic : t -> bool
   (* val determinize : t -> t *)
   
-  (* val check_word : t -> lt Seq.t -> bool *)
+  val check_word : t -> lt list -> bool
 
   (* val to_regex : t -> string *)
   (* val from_regex : string -> t *)
@@ -81,6 +81,10 @@ module Make (Lt : OrderedEmptyPrintableType) (St : OrderedPrintableType) : S wit
 
 
 
+  let find_state (states : st list)
+                 (state : st) : st option =
+    List.find_opt (fun s -> St.compare s state = 0) states
+
   let is_there_empty (trans : trans_list) : bool =
     List.exists (fun (_, letter, _) -> Lt.compare letter eps = 0) trans
 
@@ -95,6 +99,8 @@ module Make (Lt : OrderedEmptyPrintableType) (St : OrderedPrintableType) : S wit
         | _ -> c2
       end
     | _ -> c1
+
+
 
   let get_transition_from (auto : t) 
                           (state : st) : trans_list =
@@ -141,7 +147,7 @@ module Make (Lt : OrderedEmptyPrintableType) (St : OrderedPrintableType) : S wit
 
   let add_state (auto : t) 
                 (state : st) : t =
-    match List.find_opt (fun s -> St.compare s state = 0) auto.states with
+    match find_state auto.states state with
     | None -> { auto with states = state :: auto.states }
     | Some _ -> auto
 
@@ -156,13 +162,13 @@ module Make (Lt : OrderedEmptyPrintableType) (St : OrderedPrintableType) : S wit
 
   let add_start (auto : t) 
                 (state : st) : t =
-    match List.find_opt (fun s -> St.compare s state = 0) auto.starts with
+    match find_state auto.starts state with
     | None -> { auto with starts = state :: auto.starts }
     | Some _ -> auto
 
   let add_end (auto : t) 
               (state : st) : t =
-    match List.find_opt (fun s -> St.compare s state = 0) auto.ends with
+    match find_state auto.ends state with
     | None -> { auto with ends = state :: auto.ends }
     | Some _ -> auto
 
@@ -251,6 +257,35 @@ module Make (Lt : OrderedEmptyPrintableType) (St : OrderedPrintableType) : S wit
           check letters eps && acc
       )
       true auto.states
+
+
+
+  let check_word (auto : t)
+                 (word : lt list) : bool =
+    let rec graph_path (remaining_word : lt list)
+                       (current_state : st) : bool =
+      match remaining_word with
+      | [] ->
+        begin
+          match find_state auto.ends current_state with
+          | None -> false
+          | Some _ -> failwith "true"
+        end
+      | letter :: remaining_word ->
+        begin
+          (* Get all transitions from [current_state] *)
+          let trans = get_transition_from auto current_state in
+          (* Get all transitions labeled [letter] *)
+          let trans = List.filter (fun (current_state, l, next_state) -> Lt.compare l letter = 0) trans in
+          (* Get all possible next states *)
+          let states = List.map (fun (_, _, next_state) -> next_state) trans in
+          (* If states is empty, backtracking (and returns false) *)
+          List.fold_left (fun acc next_state -> graph_path remaining_word next_state) false states
+        end
+    in 
+    try
+      List.fold_left (fun acc first_state -> (graph_path word first_state) || acc) false auto.starts
+    with _ -> true
 
 
 

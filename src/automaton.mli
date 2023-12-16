@@ -48,7 +48,7 @@ module type S = sig
   val is_deterministic : t -> bool
   (* val determinize : t -> t *)
   
-  (* val check_word : t -> lt Seq.t -> bool *)
+  val check_word : t -> lt list -> bool
 
   (* val to_regex : t -> string *)
   (* val from_regex : string -> t *)
