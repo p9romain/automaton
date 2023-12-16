@@ -264,7 +264,7 @@ module Make (Lt : Letter) (St : State) : S with type lt = Lt.t and type st = St.
 
   let check_word (auto : t)
                  (word : string) : bool =
-    let rec graph_path (remaining_word : lt list)
+    let rec read_word (remaining_word : lt list)
                        (current_state : st) : bool =
       match remaining_word with
       | [] ->
@@ -290,6 +290,18 @@ module Make (Lt : Letter) (St : State) : S with type lt = Lt.t and type st = St.
       List.fold_left (fun acc first_state -> (graph_path word first_state) || acc) false auto.starts
     with _ -> true
 
+
+
+  (* 
+    TODO : ocamllex and menhir? (i think yes)
+
+    let from_regex (reg : string) : t =
+    let read_regex (reg : char list)
+                   (auto : t) : t =
+      empty
+    in
+    read_regex (List.of_seq @@ String.to_seq reg) empty
+   *)
 
 
   let to_dot (auto : t)
