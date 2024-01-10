@@ -182,13 +182,13 @@ module Make (Lt : Letter) (St : State) : S with type lt = Lt.t and type st = St.
     | Some letter ->
       begin
         match List.find_opt (fun letter' -> Lt.compare letter letter' = 0 ) automaton.alphabet with
-        | None -> 
+        | Some _ -> 
           begin
             match List.find_opt (fun trans' -> trans_compare trans trans' = 0 ) automaton.trans with
             | None -> { automaton with trans = trans :: automaton.trans }
             | Some _ -> automaton
           end
-        | Some _ -> failwith "given letter isn't in the automaton's alphabet"
+        | None -> failwith "given letter isn't in the automaton's alphabet"
       end
 
   let add_start (automaton : t) 
