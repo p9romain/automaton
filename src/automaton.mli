@@ -43,7 +43,7 @@ module type S = sig
   val is_deterministic : t -> bool
   (* val determinize : t -> t *)
   
-  val check_word : t -> string -> bool
+  val check_word : t -> lt list -> bool
 
   (* val to_regex : t -> string *)
   (* val from_regex : string -> t *)
@@ -52,4 +52,4 @@ module type S = sig
 
 end
 
-module Make (Lt : Letter) (St : State) : S
+module Make (Lt : Letter) (St : State) : S with type lt = Lt.t and type st = St.t
