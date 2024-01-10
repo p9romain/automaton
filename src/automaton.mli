@@ -4,7 +4,6 @@ module type State = sig
   type t
 
   val compare : t -> t -> int
-
   val to_string : t -> string
 
 end
@@ -15,13 +14,7 @@ module type Letter = sig
   type t
 
   val compare : t -> t -> int
-
   val to_string : t -> string
-
-  val empty : t
-  val is_empty : t -> bool
-
-  val string_to_list : string -> t list
 
 end
 
@@ -59,4 +52,4 @@ module type S = sig
 
 end
 
-module Make (Lt : Letter) (St : State) : S with type lt = Lt.t and type st = St.t
+module Make (Lt : Letter) (St : State) : S
