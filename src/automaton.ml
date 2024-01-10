@@ -77,7 +77,7 @@ module Make (Lt : Letter) (St : State) : S = struct
 
   let find_state (states : states)
                  (state : st) : st option =
-    List.find_opt (fun s -> St.compare s state = 0) states
+    List.find_opt (fun state' -> St.compare state state' = 0) states
 
   let is_there_empty (trans : transitions) : bool =
     List.exists (
@@ -162,9 +162,24 @@ module Make (Lt : Letter) (St : State) : S = struct
                 (letter : lt option)
                 (state2 : st) : t =
     let trans = (state1, letter, state2) in
-    match List.find_opt (fun trans' -> compare trans trans' = 0 ) automaton.trans with
-    | None -> { automaton with trans = trans :: automaton.trans }
-    | Some _ -> automaton
+    match letter with
+    | None -> 
+      begin
+        match List.find_opt (fun trans' -> compare trans trans' = 0 ) automaton.trans with
+        | None -> { automaton with trans = trans :: automaton.trans }
+        | Some _ -> automaton
+      end
+    | Some letter ->
+      begin
+        match List.find_opt (fun letter' -> compare letter letter' = 0 ) automaton.alphabet with
+        | None -> 
+          begin
+            match List.find_opt (fun trans' -> compare trans trans' = 0 ) automaton.trans with
+            | None -> { automaton with trans = trans :: automaton.trans }
+            | Some _ -> automaton
+          end
+        | Some _ -> failwith "given letter isn't in the automaton's alphabet"
+      end
 
   let add_start (automaton : t) 
                 (state : st) : t =
@@ -242,54 +257,43 @@ module Make (Lt : Letter) (St : State) : S = struct
   let is_deterministic (automaton : t) : bool =
     List.length automaton.starts = 1 (* Only one start state *)
     (* No same letter transition from a start state or epsilon *)
-    && List.fold_left (
-        fun acc state ->
-          (* Get all transitions from the state *)
-          let trans = get_transition_from automaton state in
-          (* Sort all the letters to see if there is more than once a letter *)
-          let letters = List.sort Lt.compare @@ List.map (fun (_, l, _) -> l) trans in
-          (* Check *)
-          let rec check l old_elt =
-            match l with
-            | [] -> true
-            | elt :: l ->
-              begin
-                match old_elt, elt with
-                (* epsilon transition *)
-                | _, Eps -> false
-                (* first letter *)
-                | Eps, _ ->
+    && 
+    List.fold_left (
+      fun acc state ->
+        (* Get all transitions from the state *)
+        let trans = get_transition_from automaton state in
+        (* Sort all the letters to see if there is more than once a letter *)
+        let letters = List.sort Lt.compare @@ List.map (fun (_, l, _) -> l) trans in
+        (* Check *)
+        let rec check l old_elt =
+          match l with
+          | [] -> true
+          | elt :: l ->
+            begin
+              match old_elt, elt with
+              (* epsilon transition *)
+              | _, Eps -> false
+              (* first letter *)
+              | Eps, _ ->
+                check l elt
+              (* else *)
+              | Letter letter, Letter letter' ->
+                if Lt.compare letter letter' = 0 then
+                  false
+                else
                   check l elt
-                (* else *)
-                | Letter letter, Letter letter' ->
-                  if Lt.compare letter letter' = 0 then
-                    false
-                  else
-                    check l elt
-              end
-          in
-          check letters None && acc
-      )
-      true automaton.states
+            end
+        in
+        check letters None && acc
+    )
+    true automaton.states
 
 
 
   let check_word (automaton : t)
                  (word : lt list) : bool =
     true
-
-
-
-  (* 
-    TODO : ocamllex and menhir? (i think yes)
-
-    let from_regex (reg : string) : t =
-    let read_regex (reg : char list)
-                   (automaton : t) : t =
-      empty
-    in
-    read_regex (List.of_seq @@ String.to_seq reg) empty
-   *)
+   
 
 
   let to_dot (automaton : t)
