@@ -26,17 +26,17 @@ module type S = sig
   val create : lt list -> t
 
   val add_state : t -> st -> t
-  val add_trans : t -> st -> lt -> st -> t
+  val add_trans : t -> st -> lt option -> st -> t
   val add_start : t -> st -> t
   val add_end : t -> st -> t
 
   val remove_state : t -> st -> t
-  val remove_one_trans : t -> st -> lt -> st -> t
+  val remove_one_trans : t -> st -> lt option -> st -> t
   val remove_all_trans : t -> st -> st -> t
   val remove_start : t -> st -> t
   val remove_end : t -> st -> t
 
-  val replace_trans : t -> st -> lt -> st -> t
+  val replace_trans : t -> st -> lt option -> st -> t
 
   val is_deterministic : t -> bool
   (* val determinize : t -> t *)
@@ -52,15 +52,13 @@ end
 
 module Make (Lt : Letter) (St : State) : S = struct
 
-  type lt = 
-    | Letter of Lt.t
-    | Eps
+  type lt = Lt.t
   type lang = lt list
   
   type st = St.t
   type states = st list
 
-  type tr = st * lt * st
+  type tr = st * lt option * st
   type transitions = tr list
 
   type t = { 
@@ -85,7 +83,7 @@ module Make (Lt : Letter) (St : State) : S = struct
     List.exists (
       fun (_, letter, _) -> 
         match letter with 
-        | Eps -> true 
+        | None -> true 
         | _ -> false
     ) trans
 
@@ -96,12 +94,12 @@ module Make (Lt : Letter) (St : State) : S = struct
     | 0 ->
       begin
         match letter, letter' with
-        | Letter letter, Letter letter' ->
+        | Some letter, Some letter' ->
           let c2 = Lt.compare letter letter' in
           match c2 with
           | 0 -> St.compare state2 state2'
           | _ -> c2
-        | Eps, Eps ->
+        | None, None ->
           St.compare state2 state2'
         | _ -> 
           -1 (* arbitrary : i just need a not zero value *)
@@ -161,7 +159,7 @@ module Make (Lt : Letter) (St : State) : S = struct
 
   let add_trans (automaton : t) 
                 (state1 : st) 
-                (letter : lt)
+                (letter : lt option)
                 (state2 : st) : t =
     let trans = (state1, letter, state2) in
     match List.find_opt (fun trans' -> compare trans trans' = 0 ) automaton.trans with
@@ -198,7 +196,7 @@ module Make (Lt : Letter) (St : State) : S = struct
 
   let remove_one_trans (automaton : t) 
                        (state1 : st) 
-                       (letter : lt) 
+                       (letter : lt option) 
                        (state2 : st) : t =
     let rec remove_first_trans_from_list (l : transitions)
                                          (elt : tr) : transitions =
@@ -235,7 +233,7 @@ module Make (Lt : Letter) (St : State) : S = struct
 
   let replace_trans (automaton : t) 
                     (state1 : st) 
-                    (letter : lt) 
+                    (letter : lt option) 
                     (state2 : st) : t =  
     add_trans (remove_all_trans automaton state1 state2) state1 letter state2
 
@@ -243,26 +241,34 @@ module Make (Lt : Letter) (St : State) : S = struct
 
   let is_deterministic (automaton : t) : bool =
     List.length automaton.starts = 1 (* Only one start state *)
-    (* No epsilon transition *)
-    && not (is_there_empty automaton.trans)
-    (* No same letter transition from a start state *)
+    (* No same letter transition from a start state or epsilon *)
     && List.fold_left (
-        fun acc s ->
+        fun acc state ->
           (* Get all transitions from the state *)
-          let trans = get_transition_from automaton s in
+          let trans = get_transition_from automaton state in
           (* Sort all the letters to see if there is more than once a letter *)
-          let letters = List.sort Lt.compare (List.map (fun (_, l, _) -> l) trans) in
+          let letters = List.sort Lt.compare @@ List.map (fun (_, l, _) -> l) trans in
           (* Check *)
           let rec check l old_elt =
             match l with
             | [] -> true
             | elt :: l ->
-              if Lt.compare old_elt elt = 0 then
-                false
-              else
-              check l elt
+              begin
+                match old_elt, elt with
+                (* epsilon transition *)
+                | _, Eps -> false
+                (* first letter *)
+                | Eps, _ ->
+                  check l elt
+                (* else *)
+                | Letter letter, Letter letter' ->
+                  if Lt.compare letter letter' = 0 then
+                    false
+                  else
+                    check l elt
+              end
           in
-          check letters eps && acc
+          check letters None && acc
       )
       true automaton.states
 

@@ -28,17 +28,17 @@ module type S = sig
   val create : lt list -> t
 
   val add_state : t -> st -> t
-  val add_trans : t -> st -> lt -> st -> t
+  val add_trans : t -> st -> lt option -> st -> t
   val add_start : t -> st -> t
   val add_end : t -> st -> t
 
   val remove_state : t -> st -> t
-  val remove_one_trans : t -> st -> lt -> st -> t
+  val remove_one_trans : t -> st -> lt option -> st -> t
   val remove_all_trans : t -> st -> st -> t
   val remove_start : t -> st -> t
   val remove_end : t -> st -> t
 
-  val replace_trans : t -> st -> lt -> st -> t
+  val replace_trans : t -> st -> lt option -> st -> t
 
   val is_deterministic : t -> bool
   (* val determinize : t -> t *)
