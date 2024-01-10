@@ -193,15 +193,25 @@ module Make (Lt : Letter) (St : State) : S with type lt = Lt.t and type st = St.
 
   let add_start (automaton : t) 
                 (state : st) : t =
-    match find_state automaton.starts state with
-    | None -> { automaton with starts = state :: automaton.starts }
-    | Some _ -> automaton
+    match find_state automaton.states state with
+    | Some _ ->
+      begin
+        match find_state automaton.starts state with
+        | None -> { automaton with starts = state :: automaton.starts }
+        | Some _ -> automaton
+      end
+    | None -> failwith "given state must be an automaton's state"
 
   let add_end (automaton : t) 
               (state : st) : t =
-    match find_state automaton.ends state with
-    | None -> { automaton with ends = state :: automaton.ends }
-    | Some _ -> automaton
+    match find_state automaton.states state with
+    | Some _ ->
+      begin
+        match find_state automaton.ends state with
+        | None -> { automaton with ends = state :: automaton.ends }
+        | Some _ -> automaton
+      end
+    | None -> failwith "given state must be an automaton's state"
 
 
 
