@@ -49,7 +49,7 @@ module type S = sig
   val is_deterministic : t -> bool
 
   (* val determinize : t -> t *)
-  (* val get_rid_of_unreachable_set : t -> t *)
+  val get_rid_of_unreachable_set : t -> t
   (* val minimize : t -> t *)
 
   val check_word : t -> lt list -> bool

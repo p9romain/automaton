@@ -47,7 +47,7 @@ module type S = sig
   val is_deterministic : t -> bool
 
   (* val determinize : t -> t *)
-  (* val get_rid_of_unreachable_set : t -> t *)
+  val get_rid_of_unreachable_set : t -> t
   (* val minimize : t -> t *)
   
   val check_word : t -> lt list -> bool
@@ -77,6 +77,7 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
               ends : states
            }
 
+  module StateSet = Set.Make(Int)
 
   (* ================================================================= *)
   (* ================================================================= *)
@@ -86,14 +87,6 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
   let find_state (states : states)
                  (state : int) : int option =
     List.find_opt (fun state' -> compare state state' = 0) states
-
-  let is_there_empty (trans : transitions) : bool =
-    List.exists (
-      fun (_, letter, _) -> 
-        match letter with 
-        | None -> true 
-        | Some _ -> false
-    ) trans
 
   let trans_compare (state1, letter, state2 : tr) 
                     (state1', letter', state2' : tr) : int =
@@ -130,8 +123,8 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
                           (state : int) : transitions =
     List.fold_left (
       fun acc trans -> 
-        let state, _, _ = trans in 
-        if compare state state = 0 then
+        let state', _, _ = trans in 
+        if compare state state' = 0 then
           trans :: acc
         else
           acc
@@ -314,53 +307,55 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
     List.length automaton.starts = 1 (* Only one start state *)
     (* No same letter transition from a start state or epsilon *)
     && 
-    List.fold_left (
-      fun acc state ->
+    List.for_all (
+      fun state ->
         (* Get all transitions from the state *)
         let trans = get_transition_from automaton state in
         (* Sort all the letters to see if there is more than once a letter *)
         let letters = List.sort letter_compare @@ List.map (fun (_, l, _) -> l) trans in
         (* Check *)
-        let rec check l old_elt =
-          match l with
+        let rec check (letters : lt option list) 
+                      (old_elt : lt option) : bool =
+          match letters with
           | [] -> true
-          | elt :: l ->
+          | elt :: letters ->
             begin
               match old_elt, elt with
               (* epsilon transition *)
               | _, None -> false
               (* first letter *)
               | None, _ ->
-                check l elt
+                check letters elt
               (* else *)
               | Some letter, Some letter' ->
                 if Lt.compare letter letter' = 0 then
                   false
                 else
-                  check l elt
+                  check letters elt
             end
         in
-        check letters None && acc
+        check letters None
     )
-    true automaton.states
+    automaton.states
+
+
+
+  let get_rid_of_unreachable_set (automaton : t) : t =
+    automaton
 
 
 
   let check_word (automaton : t)
                  (word : lt list) : bool =
-    let open Set.Make(Int) in
-    let get_transition_from = get_transition_from automaton in
     (* parrallel search *)
-    let end_states = to_list 
-      @@
-      List.fold_left (
+    let end_states = List.fold_left (
         fun acc letter ->
           (* getting all transitions from all current states *)
-          let get_trans = List.flatten @@ List.map get_transition_from @@ to_list acc in
+          let get_trans = StateSet.fold (fun state acc -> (get_transition_from automaton state) @ acc) acc [] in
           (* getting all next states *)
-          let rec next_states transitions =
+          let rec next_states (transitions : transitions) : StateSet.t =
             match transitions with
-            | [] -> []
+            | [] -> StateSet.empty
             | trans :: transitions ->
               begin
                 let (_, letter', state) = trans in
@@ -368,30 +363,31 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
                 (* epsilon transition *)
                 | None ->
                   (* all transitions after this epsilon transition *)
-                  let next_eps_trans = get_transition_from state in
-                  next_states transitions @ next_states next_eps_trans
+                  let next_eps_trans = get_transition_from automaton state in
+                  StateSet.union (next_states transitions) @@ next_states next_eps_trans
                 (* else *)
                 | Some letter' ->
                   (* check if we need to check this path *)
                   if Lt.compare letter letter' = 0 then
-                    state :: next_states transitions
+                    StateSet.add state @@ next_states transitions
                   (* next transition *)
                   else
                     next_states transitions
               end
           in
-          of_list @@ next_states get_trans
+          next_states get_trans
       )
-      (of_list automaton.starts) word
+      (StateSet.of_list automaton.starts) word
     in
     (* if one end state is an end state of the automaton *)
-    List.exists (
+    StateSet.exists (
       fun state -> 
         match List.find_opt (fun state' -> Int.compare state state' = 0) automaton.ends with 
         | None -> false 
         | Some _ -> true
     )
     end_states
+
 
 
   let to_dot (automaton : t)
