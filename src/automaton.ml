@@ -25,20 +25,30 @@ module type S = sig
   val create : lt list -> t
 
   val add_state : t -> int -> t
+  val add_states : t -> int list -> t
   val add_trans : t -> int -> lt option -> int -> t
+  val add_transitions : t -> (int * lt option * int) list -> t
   val add_start : t -> int -> t
+  val add_starts : t -> int list -> t
   val add_end : t -> int -> t
+  val add_ends : t -> int list -> t
 
   val remove_state : t -> int -> t
-  val remove_one_trans : t -> int -> lt option -> int -> t
-  val remove_all_trans : t -> int -> int -> t
+  val remove_states : t -> int list -> t
+  val remove_trans : t -> int -> lt option -> int -> t
+  val remove_all_trans_between : t -> int -> int -> t
   val remove_start : t -> int -> t
+  val remove_starts : t -> int list -> t
   val remove_end : t -> int -> t
+  val remove_ends : t -> int list -> t
 
   val replace_trans : t -> int -> lt option -> int -> t
 
   val is_deterministic : t -> bool
+
   (* val determinize : t -> t *)
+  (* val get_rid_of_unreachable_set : t -> t *)
+  (* val minimize : t -> t *)
   
   val check_word : t -> lt list -> bool
 
@@ -165,6 +175,10 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
     | None -> { automaton with states = state :: automaton.states }
     | Some _ -> automaton
 
+  let add_states (automaton : t) 
+                 (states : states) : t =
+    List.fold_left (fun acc state -> add_state acc state) automaton states
+
   let add_trans (automaton : t) 
                 (state1 : int) 
                 (letter : lt option)
@@ -189,6 +203,10 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
         | None -> failwith "given letter isn't in the automaton's alphabet"
       end
 
+  let add_transitions (automaton : t) 
+                      (transitions : transitions) : t =
+    List.fold_left (fun acc (state1, letter, state2) -> add_trans acc state1 letter state2) automaton transitions
+
   let add_start (automaton : t) 
                 (state : int) : t =
     match find_state automaton.states state with
@@ -200,6 +218,10 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
       end
     | None -> failwith "given state must be an automaton's state"
 
+  let add_starts (automaton : t) 
+                 (states : states) : t =
+    List.fold_left (fun acc state -> add_start acc state) automaton states
+
   let add_end (automaton : t) 
               (state : int) : t =
     match find_state automaton.states state with
@@ -210,6 +232,10 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
         | Some _ -> automaton
       end
     | None -> failwith "given state must be an automaton's state"
+
+  let add_ends (automaton : t) 
+               (states : states) : t =
+    List.fold_left (fun acc state -> add_end acc state) automaton states
 
 
 
@@ -227,10 +253,14 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
                    (state : int) : t =
     { automaton with states = remove_first_state_from_list automaton.states state }
 
-  let remove_one_trans (automaton : t) 
-                       (state1 : int) 
-                       (letter : lt option) 
-                       (state2 : int) : t =
+  let remove_states (automaton : t) 
+                    (states : states) : t =
+    List.fold_left (fun acc state -> remove_state acc state) automaton states
+
+  let remove_trans (automaton : t) 
+                   (state1 : int) 
+                   (letter : lt option) 
+                   (state2 : int) : t =
     let rec remove_first_trans_from_list (l : transitions)
                                          (elt : tr) : transitions =
       match l with
@@ -243,9 +273,9 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
     in
     { automaton with trans = remove_first_trans_from_list automaton.trans (state1, letter, state2) }
 
-  let remove_all_trans (automaton : t) 
-                       (state1 : int) 
-                       (state2 : int) : t =
+  let remove_all_trans_between (automaton : t) 
+                               (state1 : int) 
+                               (state2 : int) : t =
     let transitions = List.filter (
       fun (s1, _, s2) -> 
         compare state1 s1 <> 0 && compare state2 s2 <> 0 
@@ -258,9 +288,17 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
                    (state : int) : t =
     { automaton with starts = remove_first_state_from_list automaton.starts state }
 
+  let remove_starts (automaton : t) 
+                    (states : states) : t =
+    List.fold_left (fun acc state -> remove_start acc state) automaton states
+
   let remove_end (automaton : t) 
                  (state : int) : t =
     { automaton with ends = remove_first_state_from_list automaton.ends state }
+
+  let remove_ends (automaton : t) 
+                  (states : states) : t =
+    List.fold_left (fun acc state -> remove_end acc state) automaton states
 
 
 
@@ -268,7 +306,7 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
                     (state1 : int) 
                     (letter : lt option) 
                     (state2 : int) : t =  
-    add_trans (remove_all_trans automaton state1 state2) state1 letter state2
+    add_trans (remove_all_trans_between automaton state1 state2) state1 letter state2
 
 
 
@@ -386,7 +424,7 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
           ) 
           automaton.states
       ) 
-      automaton.states ;(* TODO : merge in one arrow per states pair *)
+      automaton.states ;
     Printf.fprintf file "}" ;
     close_out file ;
 
