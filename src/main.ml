@@ -10,7 +10,7 @@ end
 let string_to_string_list s =
   List.map (fun c -> String.make 1 c) @@ List.of_seq @@ String.to_seq s
 
-module A = Automaton.Make(StringS)(Int)
+module A = Automaton.Make(StringS)
 
 let auto = A.create ["a"; "b"]
 let auto = List.fold_left (fun acc x -> A.add_state acc x) auto [1; 2; 3; 4]

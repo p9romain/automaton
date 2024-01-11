@@ -21,24 +21,23 @@ end
 module type S = sig
 
   type lt
-  type st
   type t
 
   val empty : t
   val create : lt list -> t
 
-  val add_state : t -> st -> t
-  val add_trans : t -> st -> lt option -> st -> t
-  val add_start : t -> st -> t
-  val add_end : t -> st -> t
+  val add_state : t -> int -> t
+  val add_trans : t -> int -> lt option -> int -> t
+  val add_start : t -> int -> t
+  val add_end : t -> int -> t
 
-  val remove_state : t -> st -> t
-  val remove_one_trans : t -> st -> lt option -> st -> t
-  val remove_all_trans : t -> st -> st -> t
-  val remove_start : t -> st -> t
-  val remove_end : t -> st -> t
+  val remove_state : t -> int -> t
+  val remove_one_trans : t -> int -> lt option -> int -> t
+  val remove_all_trans : t -> int -> int -> t
+  val remove_start : t -> int -> t
+  val remove_end : t -> int -> t
 
-  val replace_trans : t -> st -> lt option -> st -> t
+  val replace_trans : t -> int -> lt option -> int -> t
 
   val is_deterministic : t -> bool
   (* val determinize : t -> t *)
@@ -52,4 +51,4 @@ module type S = sig
 
 end
 
-module Make (Lt : Letter) (St : State) : S with type lt = Lt.t and type st = St.t
+module Make (Lt : Letter) : S with type lt = Lt.t
