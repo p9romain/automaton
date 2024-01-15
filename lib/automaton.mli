@@ -95,10 +95,7 @@ module type S = sig
   val get_rid_of_unreachable_states : t -> t
   (* [minimize automaton] returns a minimized version of [automaton], the smallest possible 
 
-     [automaton] must be a complete DFA without unreachable states.
-
-     An automaton is complete if for all states and letters, there exists a state such that the transition labelled by the letter between the two states is an automaton's transition.
-       Adding a "sink state" can fix this condition *)
+     [automaton] must be a DFA without unreachable states *)
   (* val minimize : t -> t *)
 
   (* [check_word automaton word] checks if [word] is recognized by [automaton] *)
