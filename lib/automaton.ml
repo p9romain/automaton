@@ -38,7 +38,7 @@ module type S = sig
   val is_deterministic : t -> bool
 
   val determinize : t -> t
-  (* val get_rid_of_unreachable_states : t -> t *)
+  val get_rid_of_unreachable_states : t -> t
   (* val minimize : t -> t *)
   
   (* val check_word : t -> lt list -> bool *)
@@ -529,32 +529,13 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
     let end_states = StateSetHashtbl.fold (
       fun states state_name acc ->
         (* If one of the state in states (which is a StateSet) is an end state, then the state name of states is an end state *)
-        let b = List.exists (
-          fun state ->
-            match StateSet.find_opt state states with
-            | None -> false (* the end state isn't in the set *)
-            | Some _ -> true
-        ) 
-        automaton.ends
-        in
-        if b then
+       if List.exists (fun state -> StateSet.mem state states) automaton.ends then
           state_name :: acc
         else
           acc
     ) 
     states_name [] 
     in
-    (* let () = List.iter (fun s -> Printf.printf "%s " @@ Lt.to_string s) automaton.alphabet in
-    let () = Printf.printf "\n" in
-    let () = List.iter (Printf.printf "%d ") @@ List.of_seq @@ StateSetHashtbl.to_seq_values states_name in
-    let () = Printf.printf "\n" in
-    let () = Printf.printf "%d" @@ StateSetHashtbl.find states_name @@ Hashtbl.find eps_closure start_state in
-    let () = Printf.printf "\n" in
-    let () = List.iter (fun (s1, Some l, s2) -> Printf.printf "(%d, %s, %d) " s1 (Lt.to_string l) s2) transitions in
-    let () = Printf.printf "\n" in
-    let () = List.iter (Printf.printf "%d ") end_states in
-    let () = Printf.printf "\n"
-    in *)
     (* The DFA automaton *)
     { 
       (* Same alphabet *)
@@ -567,5 +548,28 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
       trans = transitions ;
       (* Previously calculated end states *)
       ends = end_states ; 
+    }
+
+  let get_rid_of_unreachable_states (automaton : t) : t =
+    let states = List.fold_left (
+      fun acc state ->
+        let rec get_all_accessible_states state acc =
+          let trans = get_transition_from automaton state in
+          List.fold_left (
+            fun acc' (state1, _, state2) ->
+              List.append acc' @@ List.cons state1 @@ get_all_accessible_states state2 []
+          ) 
+          [] trans
+        in
+        StateSet.union acc @@ StateSet.of_list @@ get_all_accessible_states state []
+    ) 
+    StateSet.empty automaton.starts 
+    in
+    { 
+      alphabet = automaton.alphabet ; 
+      states = StateSet.to_list @@ states ;
+      starts = List.filter (fun state -> StateSet.mem state states) automaton.starts ; 
+      trans = List.filter (fun (state, _, _) -> StateSet.mem state states) automaton.trans ;
+      ends = List.filter (fun state -> StateSet.mem state states) automaton.ends ; 
     }
 end

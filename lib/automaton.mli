@@ -92,7 +92,7 @@ module type S = sig
         For instance, if we have (1, "a", 2) and (1, "a", 3), then it isn't deterministic *)
   val determinize : t -> t
   (* [get_rid_of_unreachable_states automaton] returns [automaton] without unreachable states *)
-  (* val get_rid_of_unreachable_states : t -> t *)
+  val get_rid_of_unreachable_states : t -> t
   (* [minimize automaton] returns a minimized version of [automaton], the smallest possible 
 
      [automaton] must be a complete DFA without unreachable states.
