@@ -408,20 +408,19 @@ module Make (Lt : Letter) : S with type lt = Lt.t = struct
       @@ StateSet.choose automaton.states 
     in
     (* Get its state name *)
-    let automaton = add_state automaton @@ start_state in
+    let automaton = add_state automaton start_state in
     (* Link the new start state with previous start states *)
     let automaton = StateSet.fold (
-      fun (state' : state)
+      fun (state : state)
           (automaton : t) : t ->
-        add_trans automaton start_state None state'
+        add_trans automaton start_state None state
     ) 
     automaton.starts automaton 
     in
     (* Removes old start states *)
     let automaton = { automaton with starts = StateSet.empty } in
     (* Add new start state *)
-    let automaton = add_start automaton start_state 
-    in
+    let automaton = add_start automaton start_state in
     (* To get rid of eps transitions *)
     let eps_closure = Hashtbl.create 16 in
     let () = StateSet.iter (
@@ -455,9 +454,10 @@ module Make (Lt : Letter) : S with type lt = Lt.t = struct
                 (* next state already done *)
                 if StateSet.mem state2 already_done then
                   acc
-                else
                 (* we call on each next state [state2] and we add all his eps neighbours to [state1]'s ones*)
-                  StateSet.union acc 
+                else
+                  StateSet.union acc
+                    @@ StateSet.add state2
                     @@ get_accessible_states_with_eps_trans state2
                     @@ (StateSet.empty, StateSet.add state1 already_done)
             ) 
@@ -465,11 +465,20 @@ module Make (Lt : Letter) : S with type lt = Lt.t = struct
         in
         (* eps_closure is a map from a state to a StateSet (the set of all the accessible states with eps transitions) *)
         Hashtbl.replace eps_closure state 
-          @@ StateSet.add state 
+          @@ StateSet.add state
           @@ get_accessible_states_with_eps_trans state 
           @@ (StateSet.empty, StateSet.empty)
     ) 
     automaton.states
+    in
+    let () = Hashtbl.iter (
+      fun k v ->
+        Printf.printf "\n%d :" k ;
+        StateSet.iter (
+          fun s ->
+            Printf.printf " %d" s
+        ) v
+    ) eps_closure
     in
     (* Merging states 
       
