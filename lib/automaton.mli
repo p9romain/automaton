@@ -5,12 +5,14 @@ module type Letter = sig
 
   val compare : t -> t -> int
   val to_string : t -> string
+  val of_string : string -> t
 
 end
 
 module type S = sig
 
   type lt
+
   type t
 
   (* The empty automaton *)
@@ -101,9 +103,8 @@ module type S = sig
   (* [check_word automaton word] checks if [word] is recognized by [automaton] *)
   (* val check_word : t -> lt list -> bool *)
 
-  (* [to_regex automaton] returns the regex representing [automaton]. The returned value might be unsimplified.
-
-     [automaton] must be a DFA *)
+  (* [to_regex automaton] returns the regex representing [automaton]. 
+     The returned value might be unsimplified *)
   (* val to_regex : t -> string *)
   (* [from_regex rstring alphabet] parses [rstring] to create a NFA (Non-deterministic Finite Automaton) recognizing the regex *)
   (* val from_regex : string -> lt list -> t *)

@@ -2,12 +2,13 @@ module StringS = struct
 
   type t = string
 
-  let compare = String.compare
-  let to_string s = s
+  let compare : t -> t -> int = String.compare
+  let to_string (s : t) : string = s
+  let of_string (s : string) : t = s
 
 end
 
-let string_to_string_list s =
+let string_to_string_list (s : string) : string list =
   List.map (fun c -> String.make 1 c) @@ List.of_seq @@ String.to_seq s
 
 module A = Automaton.Make(StringS)

@@ -4,12 +4,14 @@ module type Letter = sig
 
   val compare : t -> t -> int
   val to_string : t -> string
+  val of_string : string -> t
 
 end
 
 module type S = sig
 
   type lt
+
   type t
 
   val empty : t
@@ -48,121 +50,117 @@ module type S = sig
 
 end
 
-module Make (Lt : Letter): S with type lt = Lt.t = struct
+module Make (Lt : Letter) : S with type lt = Lt.t = struct
 
   type lt = Lt.t
-  type lang = lt list
+  module Letter = struct
 
-  type states = int list
+    include Lt
 
-  type tr = int * lt option * int
-  type transitions = tr list
+    (* For eps transitions (None) *)
+    let compare_opt (letter : t option) 
+                    (letter' : t option) : int =
+      match letter, letter' with
+      | Some letter, Some letter' -> compare letter letter'
+      | None, Some _ -> -1
+      | None, None -> 0
+      | Some _, None -> 1 
+
+  end
+  module LetterSet = Set.Make(Letter)
+  type alphabet = LetterSet.t
+
+
+  type state = int
+  module State = struct
+
+    type t = state
+
+    let compare : t -> t -> int = Int.compare
+
+  end
+  module StateSet = Set.Make(State)
+  type states = StateSet.t
+  (* useful for determinize *)
+  module StateSetSet = Set.Make(StateSet)
+  type states_set = StateSetSet.t
+  module StateSetHash = struct
+
+    type t = states
+
+    let equal : states -> states -> bool = StateSet.equal
+
+    let hash (states : t) : int =
+      StateSet.fold (
+        fun (state : state) 
+            (acc : int) : int ->
+          Hashtbl.hash @@ state lxor acc
+      ) states 0
+     
+  end
+  module StateSetHashtbl = Hashtbl.Make(StateSetHash)
+
+
+  type trans = state * lt option * state
+  module Trans = struct
+
+    type t = trans
+
+    let compare (state1, letter, state2 : t) 
+                (state1', letter', state2' : t) : int =
+      let c1 = State.compare state1 state1' in
+      match c1 with
+      | 0 ->
+        begin
+          let c2 = Letter.compare_opt letter letter' in
+          match c2 with
+          | 0 -> State.compare state2 state2'
+          | _ -> c2
+        end
+      | _ -> c1
+
+  end
+  module TransSet = Set.Make(Trans)
+  type transitions = TransSet.t
+
 
   type t = { 
-              alphabet : lang ; 
+              alphabet : alphabet ; 
               states : states ; 
               starts : states ; 
               trans : transitions ; 
-              ends : states
+              ends : states ;
            }
 
-  module StateSet = Set.Make(Int)
-  module StateSetHash = struct
-
-    type t = StateSet.t
-
-    let equal s1 s2 = StateSet.equal s1 s2
-
-    let hash s =
-      StateSet.fold (
-        fun (state : int) 
-            (acc : int) : int ->
-          Hashtbl.hash @@ state lxor acc
-      ) s 0 
-  end
-
-  module StateSetHashtbl = Hashtbl.Make(StateSetHash)
-
   (* ================================================================= *)
   (* ================================================================= *)
   (* ================================================================= *)
-
-
-  let find_state (states : states)
-                 (state : int) : int option =
-    List.find_opt (fun (state' : int) : bool -> compare state state' = 0) states
-
-  let rec remove_first_state_from_list (l : states)
-                                       (elt : int) : states =
-    match l with
-    | [] -> []
-    | e :: l' ->
-      if compare elt e = 0 then
-        l'
-      else
-        e :: remove_first_state_from_list l' elt
-
-
-
-  let letter_compare (letter : lt option)
-                     (letter' : lt option) : int =
-    match letter, letter' with
-    | Some letter, Some letter' -> Lt.compare letter letter'
-    | None, Some _ -> -1
-    | None, None -> 0
-    | Some _, None -> 1 
-
-  let trans_compare (state1, letter, state2 : tr) 
-                    (state1', letter', state2' : tr) : int =
-    let c1 = compare state1 state1' in
-    match c1 with
-    | 0 ->
-      begin
-        let c2 = letter_compare letter letter' in
-        match c2 with
-        | 0 -> compare state2 state2'
-        | _ -> c2
-      end
-    | _ -> c1
-
-
 
   let get_transition_from (automaton : t) 
-                          (state : int) : transitions =
-    List.fold_left (
-      fun acc trans -> 
-        let state', _, _ = trans in 
-        if compare state state' = 0 then
-          trans :: acc
-        else
-          acc
-      ) 
-      [] automaton.trans
+                          (state : state) : transitions =
+    TransSet.filter (
+      fun (state', _, _) -> 
+        State.compare state state' = 0
+    ) 
+    automaton.trans
 
   let get_transition_between (automaton : t) 
-                             (state1 : int)
-                             (state2 : int) : transitions =
-    List.fold_left (
-      fun acc trans -> 
-        let state1', _, state2' = trans in 
-        if compare state1 state1' = 0 && compare state2 state2' = 0 then
-          trans :: acc
-        else
-          acc
-      ) 
-      [] automaton.trans
+                             (state1 : state)
+                             (state2 : state) : transitions =
+    TransSet.filter (
+      fun (state1', _, state2') -> 
+        State.compare state1 state1' = 0
+        && State.compare state2 state2' = 0
+    ) 
+    automaton.trans
 
-(*   let get_transition_to (automaton : t) 
-                        (state : int) : transitions =
-    List.fold_left (
-      fun acc trans -> 
-        let _, _, state' = trans in 
-        if compare state state' = 0 then
-          trans :: acc
-        else
-          acc
-      ) 
-      [] automaton.trans  *)                 
+  let get_transition_to (automaton : t) 
+                        (state : state) : transitions =
+    TransSet.filter (
+      fun (_, _, state') -> 
+        State.compare state state' = 0
+    ) 
+    automaton.trans              
 
 
   (* ================================================================= *)
@@ -171,107 +169,89 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
 
 
   let empty : t = { 
-                    alphabet = [] ; 
-                    states = [] ; 
-                    starts = [] ; 
-                    trans = [] ;
-                    ends = [] ; 
+                    alphabet = LetterSet.empty ; 
+                    states = StateSet.empty ; 
+                    starts = StateSet.empty ; 
+                    trans = TransSet.empty ;
+                    ends = StateSet.empty ; 
                   }
 
-  let create (alphabet : lang) : t = 
-    { empty with alphabet = alphabet }
+  let create (alphabet : lt list) : t = 
+    { empty with alphabet = LetterSet.of_list alphabet }
 
 
 
   let add_state (automaton : t) 
-                (state : int) : t =
-    match find_state automaton.states state with
-    | None -> { automaton with states = state :: automaton.states }
-    | Some _ -> automaton
+                (state : state) : t =
+    { automaton with states = StateSet.add state automaton.states }
 
   let add_states (automaton : t) 
-                 (states : states) : t =
+                 (states : state list) : t =
     List.fold_left (
       fun (acc : t) 
-          (state : int) : t ->
+          (state : state) : t ->
         add_state acc state
     ) 
     automaton states
 
   let add_trans (automaton : t) 
-                (state1 : int) 
+                (state1 : state) 
                 (letter : lt option)
-                (state2 : int) : t =
-    match find_state automaton.states state1, find_state automaton.states state2 with
+                (state2 : state) : t =
+    match StateSet.find_opt state1 automaton.states, StateSet.find_opt state2 automaton.states with
     | Some _, Some _ ->
       begin
         let trans = (state1, letter, state2) in
         match letter with
         | None -> 
-          begin
-            match List.find_opt (fun (trans' : tr) : bool -> trans_compare trans trans' = 0 ) automaton.trans with
-            | None -> { automaton with trans = trans :: automaton.trans }
-            | Some _ -> automaton
-          end
+          { automaton with trans = TransSet.add trans automaton.trans }
         | Some letter ->
           begin
-            match List.find_opt (fun (letter' : lt) : bool -> Lt.compare letter letter' = 0 ) automaton.alphabet with
+            match LetterSet.find_opt letter automaton.alphabet with
             | Some _ -> 
-              begin
-                match List.find_opt (fun (trans' : tr) : bool -> trans_compare trans trans' = 0 ) automaton.trans with
-                | None -> { automaton with trans = trans :: automaton.trans }
-                | Some _ -> automaton
-              end
+              { automaton with trans = TransSet.add trans automaton.trans }
             | None -> failwith "given letter isn't in the automaton's alphabet"
           end
       end
     | _ -> failwith "both given states must be automaton's states"
 
   let add_transitions (automaton : t) 
-                      (transitions : transitions) : t =
+                      (transitions : trans list) : t =
     List.fold_left (
       fun (acc : t) 
-          (state1, letter, state2 : tr) : t -> 
+          (state1, letter, state2 : trans) : t -> 
         add_trans acc state1 letter state2
     ) 
     automaton transitions
 
   let add_start (automaton : t) 
-                (state : int) : t =
-    match find_state automaton.states state with
+                (state : state) : t =
+    match StateSet.find_opt state automaton.states with
     | Some _ ->
-      begin
-        match find_state automaton.starts state with
-        | None -> { automaton with starts = state :: automaton.starts }
-        | Some _ -> automaton
-      end
+      { automaton with starts = StateSet.add state automaton.starts }
     | None -> failwith "given state must be an automaton's state"
 
   let add_starts (automaton : t) 
-                 (states : states) : t =
+                 (states : state list) : t =
     List.fold_left (
       fun (acc : t) 
-          (state :int) : t -> 
+          (state : state) : t -> 
         add_start acc state
     ) 
     automaton states
 
   let add_end (automaton : t) 
-              (state : int) : t =
-    match find_state automaton.states state with
+              (state : state) : t =
+    match StateSet.find_opt state automaton.states with
     | Some _ ->
-      begin
-        match find_state automaton.ends state with
-        | None -> { automaton with ends = state :: automaton.ends }
-        | Some _ -> automaton
-      end
+      { automaton with ends = StateSet.add state automaton.ends }
     | None -> failwith "given state must be an automaton's state"
 
   let add_ends (automaton : t) 
-               (states : states) : t =
+               (states : state list) : t =
     List.fold_left (
       fun (acc : t) 
-          (state :int) : t -> 
+          (state : state) : t -> 
         add_end acc state
     ) 
     automaton states
@@ -279,67 +259,57 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
 
 
   let remove_state (automaton : t) 
-                   (state : int) : t =
-    { automaton with states = remove_first_state_from_list automaton.states state }
+                   (state : state) : t =
+    { automaton with states = StateSet.remove state automaton.states }
 
   let remove_states (automaton : t) 
-                    (states : states) : t =
+                    (states : state list) : t =
     List.fold_left (
       fun (acc : t) 
-          (state :int) : t -> 
+          (state : state) : t -> 
         remove_state acc state
     ) 
     automaton states
 
   let remove_trans (automaton : t) 
-                   (state1 : int) 
+                   (state1 : state) 
                    (letter : lt option) 
-                   (state2 : int) : t =
-    let rec remove_first_trans_from_list (l : transitions)
-                                         (elt : tr) : transitions =
-      match l with
-      | [] -> []
-      | e :: l' ->
-        if trans_compare elt e = 0 then
-          l'
-        else
-          e :: remove_first_trans_from_list l' elt
-    in
-    { automaton with trans = remove_first_trans_from_list automaton.trans (state1, letter, state2) }
+                   (state2 : state) : t =
+    { automaton with trans = TransSet.remove (state1, letter, state2) automaton.trans }
 
   let remove_all_trans_between (automaton : t) 
-                               (state1 : int) 
-                               (state2 : int) : t =
-    let transitions = List.filter (
-      fun (s1, _, s2 : tr) : bool -> 
-        compare state1 s1 <> 0 || compare state2 s2 <> 0 
+                               (state1 : state) 
+                               (state2 : state) : t =
+    let transitions = TransSet.filter (
+      fun (s1, _, s2 : trans) : bool -> 
+        State.compare state1 s1 <> 0 || State.compare state2 s2 <> 0 
       ) 
       automaton.trans
     in
     { automaton with trans = transitions }
 
   let remove_start (automaton : t) 
-                   (state : int) : t =
-    { automaton with starts = remove_first_state_from_list automaton.starts state }
+                   (state : state) : t =
+    { automaton with starts = StateSet.remove state automaton.starts }
 
   let remove_starts (automaton : t) 
-                    (states : states) : t =
+                    (states : state list) : t =
     List.fold_left (
       fun (acc : t) 
-          (state : int) : t -> 
+          (state : state) : t -> 
         remove_start acc state
     ) 
     automaton states
 
   let remove_end (automaton : t) 
-                 (state : int) : t =
-    { automaton with ends = remove_first_state_from_list automaton.ends state }
+                 (state : state) : t =
+    { automaton with ends = StateSet.remove state automaton.ends }
 
   let remove_ends (automaton : t) 
-                  (states : states) : t =
+                  (states : state list) : t =
     List.fold_left (
       fun (acc : t) 
-          (state :int) : t -> 
+          (state : state) : t -> 
         remove_end acc state
     ) 
     automaton states
@@ -350,31 +320,36 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
              (file_name : string) : unit =
     let file = open_out (file_name ^ ".dot") in
     Printf.fprintf file "digraph automaton\n{\n" ;
-    List.iteri ( 
-      fun (i :int) 
-          (state : int) : unit -> 
-        Printf.fprintf file "  __INVISIBLE_NODE_%d__ [label= \"\", shape=none,height=.0,width=.0] ;\n" i ;
-        Printf.fprintf file "  __INVISIBLE_NODE_%d__ -> %s ;\n" i (string_of_int state)
-      ) 
-      automaton.starts ;
-    List.iter ( fun (state : int) : unit -> Printf.fprintf file "  %s [peripheries=2] ;\n" (string_of_int state) ) automaton.ends ;
-    List.iter (
-      fun state1 ->
-        List.iter (
-          fun state2 ->
-            match get_transition_between automaton state1 state2 with
-            | [] -> ()
-            | transitions ->
-              let letters = List.map (
-                fun (_, letter, _ : tr) : string ->
-                  match letter with
-                  | None -> "ε"
-                  | Some letter -> Lt.to_string letter
-              ) transitions 
-              in
-              let letter = String.concat ", " letters in
+    let i = ref 0 in
+    StateSet.iter ( 
+      fun (state : state) : unit -> 
+        Printf.fprintf file "  __INVISIBLE_NODE_%d__ [label= \"\", shape=none,height=.0,width=.0] ;\n" !i ;
+        Printf.fprintf file "  __INVISIBLE_NODE_%d__ -> %s ;\n" !i @@ string_of_int state ;
+        i := !i + 1
+    ) 
+    automaton.starts ;
+    StateSet.iter ( 
+      fun (state : state) : unit ->
+        Printf.fprintf file "  %s [peripheries=2] ;\n" @@ string_of_int state 
+    ) 
+    automaton.ends ;
+    StateSet.iter (
+      fun (state1 : state) : unit ->
+        StateSet.iter (
+          fun (state2 : state) : unit ->
+            let letters = List.map (
+              fun (_, letter, _ : trans) : string ->
+                match letter with
+                | None -> "ε"
+                | Some letter -> Lt.to_string letter
+            ) 
+              @@ TransSet.to_list 
+              @@ get_transition_between automaton state1 state2 
+            in
+            let letter = String.concat ", " letters in
+            if letter <> "" then 
               Printf.fprintf file "  %s -> %s [label=\"%s\"] ;\n" (string_of_int state1) (string_of_int state2) letter
-          ) 
+          )
           automaton.states
       ) 
       automaton.states ;
@@ -384,15 +359,21 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
 
 
   let is_deterministic (automaton : t) : bool =
-    List.length automaton.starts = 1 (* Only one start state *)
+    StateSet.cardinal automaton.starts = 1 (* Only one start state *)
     (* No epsilon transition or same letter transition from a state *)
     && 
-    List.for_all (
+    StateSet.for_all (
       fun state ->
         (* Get all transitions from the state *)
         let transitions = get_transition_from automaton state in
         (* Sort all the letters to see if there is more than once a letter *)
-        let letters = List.sort letter_compare @@ List.map (fun (_, l, _ : tr) : lt option -> l) transitions in
+        let letters = List.sort Letter.compare_opt @@ TransSet.fold (
+          fun (_, letter, _ : trans)
+              (acc : lt option list) : lt option list ->
+            letter :: acc
+        ) 
+        transitions [] 
+        in
         (* Check *)
         let rec check (letters : lt option list) 
                       (old_elt : lt option) : bool =
@@ -408,7 +389,7 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
                 check letters elt
               (* else : comparing previous letter checked with current letter*)
               | Some letter, Some letter' ->
-                if Lt.compare letter letter' = 0 then
+                if Letter.compare letter letter' = 0 then
                   false
                 else
                   check letters elt
@@ -421,123 +402,156 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
 
 
   let determinize (automaton : t) : t =
-    (* Only one start state *)
-    let start_state = (List.fold_left min (List.nth automaton.states 0) automaton.states) - 1 in
+    (* Only one start state (state nb = min-1)*)
+    let start_state = (+) (-1) 
+      @@ StateSet.fold min automaton.states 
+      @@ StateSet.choose automaton.states 
+    in
     (* Get its state name *)
     let automaton = add_state automaton @@ start_state in
     (* Link the new start state with previous start states *)
-    let automaton = add_transitions automaton @@ List.map (fun (state : int) : tr -> (start_state, None, state)) automaton.starts in
+    let automaton = StateSet.fold (
+      fun (state' : state)
+          (automaton : t) : t ->
+        add_trans automaton start_state None state'
+    ) 
+    automaton.starts automaton 
+    in
     (* Removes old start states *)
-    let automaton = remove_starts automaton automaton.starts in
+    let automaton = { automaton with starts = StateSet.empty } in
     (* Add new start state *)
-    let automaton = add_start automaton start_state in
+    let automaton = add_start automaton start_state 
+    in
     (* To get rid of eps transitions *)
     let eps_closure = Hashtbl.create 16 in
-    let () = List.iter (
+    let () = StateSet.iter (
       fun state ->
-        let rec get_accessible_states_with_eps_trans (state1 : int) 
+        let rec get_accessible_states_with_eps_trans (state1 : state) 
                                                      (acc, already_done : states * states) : states =
           (* all transitions *)
           let transitions = get_transition_from automaton state1 in
           (* keep only the eps transitions *)
-          let transitions = List.filter (
-            fun (_, letter, _ : tr) : bool -> 
+          let transitions = TransSet.filter (
+            fun (_, letter, _ : trans) : bool -> 
               match letter with
               | None -> true
               | _ -> false
           ) 
           transitions 
           in
-          match transitions with
-          | [] -> acc (* no eps transitions *)
-          | _ ->
-            (* next states *)
-            let states = List.map (fun (_, _, state : tr) : int -> state) transitions in
-            (* returns all the accessible states with eps transition (with transivity) *)
-            List.flatten @@ List.cons states @@ List.fold_left (
-              fun (acc : states list) 
-                  (state' : int) : states list -> 
-                (* continue eps-transition path if it isn't in already_done*)
-                match List.find_opt (fun (state : int) : bool -> compare state state' = 0) already_done with
-                | None -> (get_accessible_states_with_eps_trans state' ([], state1 :: already_done)) :: acc
-                | Some _ -> acc
-            ) [] states
+          if TransSet.is_empty transitions then
+            acc
+          else
+            let states = TransSet.fold (
+              fun (_, _, state2 : trans) 
+                  (acc : states) : states -> 
+                StateSet.add state2 acc
+            ) 
+            transitions StateSet.empty 
+            in
+            StateSet.fold (
+              fun (state2 : state)
+                  (acc : states) : states ->
+                (* next state already done *)
+                if StateSet.mem state2 already_done then
+                  acc
+                else
+                (* we call on each next state [state2] and we add all his eps neighbours to [state1]'s ones*)
+                  StateSet.union acc 
+                    @@ get_accessible_states_with_eps_trans state2
+                    @@ (StateSet.empty, StateSet.add state1 already_done)
+            ) 
+            states StateSet.empty
         in
         (* eps_closure is a map from a state to a StateSet (the set of all the accessible states with eps transitions) *)
-        Hashtbl.replace eps_closure state @@ StateSet.of_list @@ List.cons state @@ get_accessible_states_with_eps_trans state ([], [])
+        Hashtbl.replace eps_closure state 
+          @@ StateSet.add state 
+          @@ get_accessible_states_with_eps_trans state 
+          @@ (StateSet.empty, StateSet.empty)
     ) 
     automaton.states
     in
-    (* Merging states *)
+    (* Merging states 
+      
+      key : states
+      value : (lt option * states) list
+
+      expl : {1, 2, 5} -> [ ("a", {1}) ; ("b", {1, 2, 5}) ; ("c", {}) ; ("d", {3, 4}) ]
+    *)
     let new_trans = StateSetHashtbl.create 16 in
-    (* Starting with the StateSets of the start_state *)
-    let states_to_do = [ Hashtbl.find eps_closure start_state ] in
-    let rec merge_transitions (states_to_do : StateSet.t list) 
-                              (states_done : StateSet.t list) : unit =
-      match states_to_do with
-      | [] -> ()
-      | states :: states_to_do ->
-        (* i_transitions : (lt option * StateSet.t) list 
+    (* Starting with the StateSets of the start_state (stack) *)
+    let states_to_do = StateSetSet.add (Hashtbl.find eps_closure start_state) StateSetSet.empty in
+    let rec merge_transitions (states_to_do : states_set) 
+                              (states_done : states_set) : unit =
+      if not @@ StateSetSet.is_empty states_to_do then
+        let states = StateSetSet.choose states_to_do in
+        let states_to_do = StateSetSet.remove states states_to_do 
+        in
+        (* i_transitions : (lt option * states) list 
             = list of all possible next states
           
-           n_to_do : StateSet.t list 
-            = list of all StateSet we need to apply the algorithm
+           n_to_do : states_set 
+            = sett of all states we need to apply the algorithm
         *)
-        let i_transitions, n_to_do = List.fold_left (
+        let i_transitions, n_to_do = LetterSet.fold (
           (* For all letter *)
-          fun (i_transitions, stack : (lt option * StateSet.t) list * StateSet.t list) 
-              (letter : lt) : ((lt option * StateSet.t) list * StateSet.t list) ->
+          fun (letter : lt)
+              (i_transitions, stack : (lt option * states) list * states_set ) : ((lt option * states) list * states_set) ->
             (* For all states in states, we gather all the next states the accesible states with a transitions labelled letter *)
             let next_states = StateSet.fold (
               fun state1 acc ->
                 (* Get all transitions *)
                 let transitions = get_transition_from automaton state1 in
-                (* Filter all next states labelled letter *)
-                let next_states = List.map (fun (_, _, state2 : tr) : int -> state2) @@ List.filter (fun (_, letter', _ : tr) : bool -> letter_compare letter' @@ Some letter = 0) transitions in
+                (* All transitions labelled [letter] *)
+                let transitions = TransSet.filter (
+                  fun (_, letter', _ : trans) : bool -> 
+                    Letter.compare_opt letter' @@ Some letter = 0
+                ) 
+                transitions 
+                in
+                (* Sets of all possible next states *)
+                let next_states = TransSet.fold (
+                  fun (_, _, state2 : trans)
+                      (acc : states) : states ->
+                    StateSet.add state2 acc
+                )
+                transitions StateSet.empty 
+                in
                 (* We join with the other accesible states *) 
-                StateSet.union acc @@ StateSet.of_list next_states
+                StateSet.union acc next_states
             ) 
             states StateSet.empty 
             in
             let n_stack =
-              (* If there isn't any next states or if it's a loop, we don't apply the algo on them *)
-              if StateSet.is_empty next_states || StateSet.compare next_states states = 0 then
-                (* No transitions *)
+              (* We don't apply the function if
+                  - there aren't any transitions
+                  - or we already did the job
+                  - or it's a loop
+               *)
+              if StateSet.is_empty next_states || StateSetSet.mem next_states states_done || StateSet.compare next_states states = 0 then
                 stack
               else
-                begin
-                  (* If the algo with [next_states] was already done, we don't add it in the [states_to_do]*)
-                  match List.find_opt (fun (s : StateSet.t) : bool -> StateSet.compare s next_states = 0) states_done with
-                  | None -> 
-                    begin
-                      (* if it's already in the to_do list *)
-                      match List.find_opt (fun (s : StateSet.t) : bool -> StateSet.compare s next_states = 0) stack with
-                      | None -> next_states :: stack
-                      | Some _ -> stack
-                    end
-                  | Some _ -> stack
-                end
+                StateSetSet.add next_states stack
             in
             (* We add the transitions labelled [letter] from [states] to [next_states], 
                and we also return the new to_do_stack *)
             (Some letter, next_states) :: i_transitions, n_stack
         ) 
-        ([], states_to_do) automaton.alphabet 
-        in 
-        (* new_trans is a map from a StateSet to a (lt option, StateSet) list : it map the future state to all the transitions (the letter and the next new state)*)
+        automaton.alphabet ([], states_to_do) 
+        in
         let () = StateSetHashtbl.replace new_trans states i_transitions in
         (* We keep_going the algo with the StateSet in the to_do list, and we add the current states to the done list since we just applied the algo to it*)
-        merge_transitions n_to_do @@ states :: states_done
+        merge_transitions n_to_do @@ StateSetSet.add states states_done
     in
-    let () = merge_transitions states_to_do [] in
+    let () = merge_transitions states_to_do StateSetSet.empty in
     (* Renaming StateSet into a state 
        This is all the new states
     *)
     let states_name = StateSetHashtbl.create 16 in
     let state_nb = ref 0 in
     let () = StateSetHashtbl.iter (
-      fun (states : StateSet.t) 
-          (_ : (lt option * StateSet.t) list) : unit -> 
+      fun (states : states) 
+          (_ : (lt option * states) list) : unit -> 
         StateSetHashtbl.replace states_name states !state_nb ;
         (* Small counter *)
         state_nb := !state_nb + 1
@@ -546,49 +560,49 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
     in
     (* Gather all new transitions *)
     let transitions = StateSetHashtbl.fold (
-      fun (state : StateSetHashtbl.key) (*int*)
-          (i_transitions : (lt option * StateSet.t) list) 
+      fun (state : states)
+          (i_transitions : (lt option * states) list) 
           (acc : transitions) ->
         (* State name ([state] is a set)*)
         let state1 = StateSetHashtbl.find states_name state in
         (* Add to the acc the new transitions *)
         let transitions = List.fold_left (
           fun (acc' : transitions) 
-              (letter, states : lt option * StateSet.t) : transitions ->
+              (letter, states : lt option * states) : transitions ->
             (* Transitions *)
             if StateSet.is_empty states then
               acc'
             else
               let trans = (state1, letter, StateSetHashtbl.find states_name states) in
-              trans :: acc'
+              TransSet.add trans acc'
         ) 
-        [] i_transitions
+        TransSet.empty i_transitions
         in 
-        List.append acc transitions
+        TransSet.union acc transitions
     )
-    new_trans [] 
+    new_trans TransSet.empty 
     in
     (* Gather all end states *)
     let end_states = StateSetHashtbl.fold (
-      fun (states : StateSet.t) 
-          (state_name : int) 
+      fun (states : states) 
+          (state_name : state) 
           (acc : states) : states ->
         (* If one of the state in states (which is a StateSet) is an end state, then the state name of states is an end state *)
-       if List.exists (fun (state : int) : bool -> StateSet.mem state states) automaton.ends then
-          state_name :: acc
+       if StateSet.exists (fun (state : state) : bool -> StateSet.mem state states) automaton.ends then
+          StateSet.add state_name acc
         else
           acc
     ) 
-    states_name [] 
+    states_name StateSet.empty
     in
     (* The DFA automaton *)
     { 
       (* Same alphabet *)
       alphabet = automaton.alphabet ; 
       (* Get all new states *)
-      states = List.of_seq @@ StateSetHashtbl.to_seq_values states_name ;
+      states = StateSet.of_seq @@ StateSetHashtbl.to_seq_values states_name ;
       (* Get the name of the state from its "set name" *)
-      starts = [ StateSetHashtbl.find states_name @@ Hashtbl.find eps_closure start_state ] ; 
+      starts = StateSet.add (StateSetHashtbl.find states_name @@ Hashtbl.find eps_closure start_state) StateSet.empty ; 
       (* Previously calculated transitions *)
       trans = transitions ;
       (* Previously calculated end states *)
@@ -596,27 +610,29 @@ module Make (Lt : Letter): S with type lt = Lt.t = struct
     }
 
   let get_rid_of_unreachable_states (automaton : t) : t =
-    let states = List.fold_left (
-      fun (acc : StateSet.t) 
-          (state : int) : StateSet.t ->
-        let rec get_all_accessible_states (state : int) : states =
-          let trans = get_transition_from automaton state in
-          List.fold_left (
-            fun (acc' : states) 
-                (state1, _, state2 : tr) : states ->
-              List.append acc' @@ List.cons state1 @@ get_all_accessible_states state2
+    let states = StateSet.fold (
+      fun (state : state)
+          (acc : states) : states ->
+        let rec get_all_accessible_states (state : state) : states =
+          let transitions = get_transition_from automaton state in
+          TransSet.fold (
+            fun (state1, _, state2 : trans)
+                (acc' : states)  : states ->
+              StateSet.union acc' 
+                @@ StateSet.add state1 
+                @@ get_all_accessible_states state2
           ) 
-          [] trans
+          transitions StateSet.empty
         in
-        StateSet.union acc @@ StateSet.of_list @@ get_all_accessible_states state
+        StateSet.union acc @@ get_all_accessible_states state
     ) 
-    StateSet.empty automaton.starts 
+     automaton.starts StateSet.empty
     in
     { 
       alphabet = automaton.alphabet ; 
-      states = StateSet.to_list @@ states ;
-      starts = List.filter (fun state -> StateSet.mem state states) automaton.starts ; 
-      trans = List.filter (fun (state, _, _) -> StateSet.mem state states) automaton.trans ;
-      ends = List.filter (fun state -> StateSet.mem state states) automaton.ends ; 
+      states = states ;
+      starts = StateSet.filter (fun state -> StateSet.mem state states) automaton.starts ; 
+      trans = TransSet.filter (fun (state, _, _) -> StateSet.mem state states) automaton.trans ;
+      ends = StateSet.filter (fun state -> StateSet.mem state states) automaton.ends ; 
     }
 end
