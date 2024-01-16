@@ -105,7 +105,7 @@ module type S = sig
 
   (* [to_regex automaton] returns the regex representing [automaton]. 
      The returned value might be unsimplified *)
-  (* val to_regex : t -> string *)
+  val to_regex : t -> string
   (* [from_regex rstring alphabet] parses [rstring] to create a NFA (Non-deterministic Finite Automaton) recognizing the regex *)
   (* val from_regex : string -> lt list -> t *)
 

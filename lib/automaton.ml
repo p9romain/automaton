@@ -45,7 +45,7 @@ module type S = sig
   
   (* val check_word : t -> lt list -> bool *)
 
-  (* val to_regex : t -> string *)
+  val to_regex : t -> string
   (* val from_regex : string -> lt list -> t *)
 
 end
@@ -341,7 +341,7 @@ module Make (Lt : Letter) : S with type lt = Lt.t = struct
               fun (_, letter, _ : trans) : string ->
                 match letter with
                 | None -> "ε"
-                | Some letter -> Lt.to_string letter
+                | Some letter -> Letter.to_string letter
             ) 
               @@ TransSet.to_list 
               @@ get_transition_between automaton state1 state2 
@@ -644,4 +644,111 @@ module Make (Lt : Letter) : S with type lt = Lt.t = struct
       trans = TransSet.filter (fun (state, _, _) -> StateSet.mem state states) automaton.trans ;
       ends = StateSet.filter (fun state -> StateSet.mem state states) automaton.ends ; 
     }
+
+
+
+  let to_regex (automaton : t) : string =
+    (* Only one start state (state nb = min-1)*)
+    let start_state = (+) (-1) 
+      @@ StateSet.fold min automaton.states 
+      @@ StateSet.choose automaton.states 
+    in
+    (* Get its state name *)
+    let automaton = add_state automaton start_state in
+    (* Link the new start state with previous start states *)
+    let automaton = StateSet.fold (
+      fun (state : state)
+          (automaton : t) : t ->
+        add_trans automaton start_state None state
+    ) 
+    automaton.starts automaton 
+    in
+    (* Removes old start states *)
+    let automaton = { automaton with starts = StateSet.empty } in
+    (* Add new start state *)
+    let automaton = add_start automaton start_state
+    in
+    (* Only one end state (state nb = max+1)*)
+    let end_state = (+) 1 
+      @@ StateSet.fold max automaton.states 
+      @@ StateSet.choose automaton.states 
+    in
+    (* Get its state name *)
+    let automaton = add_state automaton end_state in
+    (* Link the new start state with previous start states *)
+    let automaton = StateSet.fold (
+      fun (state : state)
+          (automaton : t) : t ->
+        add_trans automaton state None end_state
+    ) 
+    automaton.ends automaton 
+    in
+    (* Removes old start states *)
+    let automaton = { automaton with ends = StateSet.empty } in
+    (* Add new start state *)
+    let automaton = add_end automaton end_state 
+    in
+    (* For each states p :
+      - for each states q, if there exists two transitions p-r1-q and p-r2-q, we merge it as p-r1|r2-q
+        repeat until it isn't the case anymore
+      - for each states q and r s.t q-r1-p and p-r2-r, then
+          * if there exists a loop p-r-p, then we add q-r1 r* r2-r
+          * else, we add q-r1 r2-r
+        repeat for every transitions
+      - delete every transitions linked to p, then delete p 
+    *)
+    let automaton = StateSet.fold (
+      fun (state : state)
+          (automaton : t) : t ->
+        (* we don't touch the start and the end state *)
+        if State.compare state start_state = 0 || State.compare state end_state = 0 then
+          automaton
+        else
+          let loop_trans = get_transition_between automaton state state in
+          if TransSet.is_empty loop_trans then
+            let to_trans = get_transition_to automaton state
+            in
+            (* transitions merge with regex | *)
+            let from_trans = get_transition_from automaton state in
+            (* let from_trans = 
+              let rec merge_trans 
+            in *)
+            (* delete old transitions and current state *)
+            let automaton = { automaton with states = StateSet.remove state automaton.states ;
+                                             trans = TransSet.diff automaton.trans @@ TransSet.union to_trans from_trans }
+            in
+            (* new transitions with regex concat *)
+            let transitions = TransSet.fold (
+              fun (state1, letter, _ : trans)
+                  (acc : transitions) : transitions ->
+                TransSet.union acc @@ TransSet.fold (
+                  fun (_, letter', state2 : trans)
+                      (acc' : transitions) : transitions ->
+                    let trans =
+                      match letter, letter' with
+                      | None, None -> (state1, None, state2)
+                      | None, Some l
+                      | Some l, None -> (state1, Some l, state2)
+                      | Some l1, Some l2 -> 
+                        (
+                          state1, 
+                          Some (Letter.of_string @@ (Letter.to_string l1) ^ (Letter.to_string l2)),
+                          state2
+                        )
+                    in
+                    TransSet.add trans acc'
+                ) from_trans TransSet.empty
+            )
+            to_trans TransSet.empty
+            in
+            { automaton with trans = TransSet.union automaton.trans transitions }
+          else
+            automaton
+    )
+    automaton.states automaton
+    in
+    match TransSet.choose @@ get_transition_between automaton start_state end_state with
+    | (_, Some letter, _) -> Letter.to_string letter 
+    | (_, None, _) -> "ε"
+
 end
