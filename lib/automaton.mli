@@ -1,13 +1,29 @@
 (* For the alphabet *)
-module type Letter = sig
+module type Symbol = sig
 
   type t
 
   val compare : t -> t -> int
   val to_string : t -> string
-  val of_string : string -> t
+  (* val of_string : string -> t *)
 
 end
+
+module type Letter = sig
+
+  type symbol
+
+  include Symbol
+
+  val epsilon : t
+  val is_epsilon : t -> bool
+
+  val get : t -> symbol option
+  val symbol : symbol -> t
+
+end
+
+module AddEpsilon(Sym : Symbol) : Letter with type symbol = Sym.t
 
 module type S = sig
 
@@ -33,9 +49,9 @@ module type S = sig
      Raises : [l] must be in the [automaton]'s alphabet.
 
      If the transition is already in [automaton], does nothing *)
-  val add_trans : t -> int -> lt option -> int -> t
+  val add_trans : t -> int -> lt -> int -> t
   (* [add_transitions automaton transitions] adds several transitions in [automaton] *)
-  val add_transitions : t -> (int * lt option * int) list -> t
+  val add_transitions : t -> (int * lt * int) list -> t
   (* [add_start automaton state] sets [state] as a start state in [automaton].
      If it's already the case, does nothing
 
@@ -58,7 +74,7 @@ module type S = sig
   val remove_states : t -> int list -> t
   (* [remove_trans automaton state1 letter state2] removes the given transitions from [automaton]'s transitions.
      If it isn't an [automaton]'s transitions, does nothing *)
-  val remove_trans : t -> int -> lt option -> int -> t
+  val remove_trans : t -> int -> lt -> int -> t
   (* [remove_all_trans_between automaton state1 state2] removes all transitions between [state1] and [state2] in [automaton] *)
   val remove_all_trans_between : t -> int -> int -> t
   (* [remove_start automaton state] unsets [state] as a start state in [automaton].
@@ -94,20 +110,23 @@ module type S = sig
         For instance, if we have (1, "a", 2) and (1, "a", 3), then it isn't deterministic *)
   val determinize : t -> t
   (* [get_rid_of_unreachable_states automaton] returns [automaton] without unreachable states *)
-  val get_rid_of_unreachable_states : t -> t
+  (* val get_rid_of_unreachable_states : t -> t *)
   (* [minimize automaton] returns a minimized version of [automaton], the smallest possible 
 
      [automaton] must be a DFA without unreachable states *)
   (* val minimize : t -> t *)
 
   (* [check_word automaton word] checks if [word] is recognized by [automaton] *)
-  (* val check_word : t -> lt list -> bool *)
-
-  (* [to_regex automaton] returns the regex representing [automaton]. 
+  val check_word : t -> lt list -> bool
+  (* [to_regex_mcn_yama automaton] returns the regex representing [automaton] using the McNaughton-Yamada method. 
      The returned value might be unsimplified *)
-  val to_regex : t -> string
-  (* [from_regex rstring alphabet] parses [rstring] to create a NFA (Non-deterministic Finite Automaton) recognizing the regex *)
-  (* val from_regex : string -> lt list -> t *)
+  (* val to_regex_mcn_yama : t -> regexp *)
+  (* [to_regex_brzo_mcc automaton] returns the regex representing [automaton] using the Brzozowski-McCluskey method,
+      also know as the "state elimination method". 
+     The returned value might be unsimplified *)
+  (* val to_regex_brzo_mcc : t -> regexp *)
+  (* [from_regex reg alphabet] creates a NFA (Non-deterministic Finite Automaton) recognizing [reg] *)
+  (* val from_regex : regexp -> lt list -> t *)
 
 end
 
