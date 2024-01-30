@@ -1,4 +1,4 @@
-module StringS : Automaton.Letter with type symbol = string = struct
+module StringS = struct
 
   type symbol = string
   type t = string

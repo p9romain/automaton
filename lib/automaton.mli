@@ -1,34 +1,6 @@
-(* For the alphabet *)
-module type Symbol = sig
-
-  type t
-
-  val compare : t -> t -> int
-  val to_string : t -> string
-  (* val of_string : string -> t *)
-
-end
-
-module type Letter = sig
-
-  type symbol
-
-  include Symbol
-
-  val epsilon : t
-  val is_epsilon : t -> bool
-
-  val get : t -> symbol option
-  val symbol : symbol -> t
-
-end
-
-module AddEpsilon(Sym : Symbol) : Letter with type symbol = Sym.t
-
 module type S = sig
 
   type lt
-
   type t
 
   (* The empty automaton *)
@@ -117,7 +89,7 @@ module type S = sig
   (* val minimize : t -> t *)
 
   (* [check_word automaton word] checks if [word] is recognized by [automaton] *)
-  val check_word : t -> lt list -> bool
+  (* val check_word : t -> lt list -> bool *)
   (* [to_regex_mcn_yama automaton] returns the regex representing [automaton] using the McNaughton-Yamada method. 
      The returned value might be unsimplified *)
   (* val to_regex_mcn_yama : t -> regexp *)
@@ -130,4 +102,4 @@ module type S = sig
 
 end
 
-module Make (Lt : Letter) : S with type lt = Lt.t
+module Make (Lt : Letter.Letter) : S with type lt = Lt.t

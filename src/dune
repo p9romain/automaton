@@ -1,6 +1,6 @@
 (executable
   (public_name automaton)
   (name main)
-  (libraries automaton regexp)
+  (libraries automaton)
   (flags ())
 )
