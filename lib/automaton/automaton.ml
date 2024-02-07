@@ -125,13 +125,13 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
     ) 
     automaton.trans
 
-  let get_transition_to (automaton : t) 
+(*   let get_transition_to (automaton : t) 
                         (state : state) : transitions =
     TransSet.filter (
       fun (_, _, state') -> 
         Int.compare state state' = 0
     ) 
-    automaton.trans              
+    automaton.trans        *)
 
 
   (* ================================================================= *)

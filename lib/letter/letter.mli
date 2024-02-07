@@ -5,7 +5,6 @@ module type Symbol = sig
 
   val compare : t -> t -> int
   val to_string : t -> string
-  (* val of_string : string -> t *)
 
 end
 
