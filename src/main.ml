@@ -22,14 +22,14 @@ end
 let string_to_string_list (s : string) : string list =
   List.map (fun c -> String.make 1 c) @@ List.of_seq @@ String.to_seq s
 
-module R = Regexp.Make(StringS)
+(* module R = Regexp.Make(StringS)
 
 let reg1 = R.(union (letter "b") @@ concat (letter "a") @@ concat (star @@ letter "a") @@ letter "b")
 let reg2 = R.(union (letter "a") @@ concat (letter "a") @@ concat (star @@ letter "b") @@ letter "b")
 let reg3 = R.(union (letter "a") @@ concat (letter "a") @@ concat (star @@ letter "a") @@ letter "a")
 
 let () = Printf.printf "r1 : %s\nr2 : %s\nr3 : %s\n" (R.to_string reg1) (R.to_string reg2) (R.to_string reg3)
-let () = Printf.printf "\nr1 : %s\nr2 : %s\nr3 : %s\n" R.(to_string @@ simplify reg1) R.(to_string @@ simplify reg2) R.(to_string @@ simplify reg3)
+let () = Printf.printf "\nr1 : %s\nr2 : %s\nr3 : %s\n" R.(to_string @@ simplify reg1) R.(to_string @@ simplify reg2) R.(to_string @@ simplify reg3) *)
 
 (* module A = Automaton.Make(StringS)
 
