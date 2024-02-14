@@ -29,12 +29,19 @@ let auto = A.add_start auto 1
 let auto = A.add_end auto 3
 let auto = A.add_transitions auto [(1, StringS.symbol "a", 1); (1, StringS.symbol "b", 1); (1, StringS.symbol "b", 2); (2, StringS.symbol "b", 3)]
 let () = A.to_dot auto "nfa"
-let () = Printf.printf "%s\n" (if A.is_deterministic auto then "true" else "false")
+let () = assert(not @@ A.is_deterministic auto)
 let dfauto = A.determinize auto
-let () = Printf.printf "%s\n" (if A.is_deterministic dfauto then "true" else "false")
+let () = assert(A.is_deterministic dfauto)
 let () = A.to_dot dfauto "dfa"
-let () = Printf.printf "%s\n" (if A.check_word dfauto @@ List.map StringS.symbol @@ string_to_string_list "a" then "true" else "false")
-let () = Printf.printf "%s\n" (if A.check_word dfauto @@ List.map StringS.symbol @@ string_to_string_list "bb" then "true" else "false")
-let () = Printf.printf "%s\n" (if A.check_word dfauto @@ List.map StringS.symbol @@ string_to_string_list "" then "true" else "false")
-let () = Printf.printf "%s\n" (if A.check_word dfauto @@ List.map StringS.symbol @@ string_to_string_list "aabbaaba" then "true" else "false")
-let () = Printf.printf "%s\n" (if A.check_word dfauto @@ List.map StringS.symbol @@ string_to_string_list "abababaaabbababbaababbaaababaabbbababbabbababababbababb" then "true" else "false")
+
+let () = assert(not @@ A.check_word auto @@ List.map StringS.symbol @@ string_to_string_list "a")
+let () = assert(A.check_word auto @@ List.map StringS.symbol @@ string_to_string_list "bb")
+let () = assert(not @@ A.check_word auto @@ List.map StringS.symbol @@ string_to_string_list "")
+let () = assert(not @@ A.check_word auto @@ List.map StringS.symbol @@ string_to_string_list "aabbaaba")
+let () = assert(A.check_word auto @@ List.map StringS.symbol @@ string_to_string_list "abababaaabbababbaababbaaababaabbbababbabbababababbababb")
+
+let () = assert(not @@ A.check_word dfauto @@ List.map StringS.symbol @@ string_to_string_list "a")
+let () = assert(A.check_word dfauto @@ List.map StringS.symbol @@ string_to_string_list "bb")
+let () = assert(not @@ A.check_word dfauto @@ List.map StringS.symbol @@ string_to_string_list "")
+let () = assert(not @@ A.check_word dfauto @@ List.map StringS.symbol @@ string_to_string_list "aabbaaba")
+let () = assert(A.check_word dfauto @@ List.map StringS.symbol @@ string_to_string_list "abababaaabbababbaababbaaababaabbbababbabbababababbababb")
