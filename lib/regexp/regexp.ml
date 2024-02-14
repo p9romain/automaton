@@ -1,4 +1,4 @@
-module type S = sig
+(* module type S = sig
 
   type lt
   type t
@@ -183,4 +183,4 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
     | Option r ->
       "(" ^ to_string r ^ ")?"
 
-end
+end *)

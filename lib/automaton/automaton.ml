@@ -32,10 +32,10 @@ module type S = sig
   (* val get_rid_of_unreachable_states : t -> t *)
   (* val minimize : t -> t *)
   
-  (* val check_word : t -> lt list -> bool *)
+  val check_word : t -> lt list -> bool
 
-  (* val to_regex_mcn_yama : t -> regexp *)
-  (* val to_regex_brzo_mcc : t -> regexp *)
+  (* val to_regex_my : t -> regexp *)
+  (* val to_regex_bm : t -> regexp *)
   (* val from_regex : regexp -> lt list -> t *)
 
 end
@@ -114,25 +114,6 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
         Int.compare state state' = 0
     ) 
     automaton.trans
-
-  let get_transition_between (automaton : t) 
-                             (state1 : state)
-                             (state2 : state) : transitions =
-    TransSet.filter (
-      fun (state1', _, state2') -> 
-        Int.compare state1 state1' = 0
-        && Int.compare state2 state2' = 0
-    ) 
-    automaton.trans
-
-(*   let get_transition_to (automaton : t) 
-                        (state : state) : transitions =
-    TransSet.filter (
-      fun (_, _, state') -> 
-        Int.compare state state' = 0
-    ) 
-    automaton.trans        *)
-
 
   (* ================================================================= *)
   (* ================================================================= *)
@@ -295,14 +276,24 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
         Printf.fprintf file "  %d [peripheries=2] ;\n" state 
     ) 
     automaton.ends ;
+    let get_transition_between (trans : transitions) 
+                               (state1 : state)
+                               (state2 : state) : trans list =
+      TransSet.to_list 
+        @@ TransSet.filter (
+          fun (state1', _, state2') -> 
+            Int.compare state1 state1' = 0
+            && Int.compare state2 state2' = 0
+        ) 
+        trans
+    in
     (* Not TransSet iter because I want to merge all transitions between two states *)
     StateSet.iter (
       fun (state1 : state) : unit ->
         StateSet.iter (
           fun (state2 : state) : unit ->
             let letters = List.map (fun (_, letter, _ : trans) : string -> Lt.to_string letter) 
-              @@ TransSet.to_list 
-              @@ get_transition_between automaton state1 state2 
+              @@ get_transition_between automaton.trans state1 state2 
             in
             let letter = String.concat ", " letters in
             if letter <> "" then 
@@ -568,4 +559,37 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
       (* Previously calculated end states *)
       ends = end_states ; 
     }
+
+
+
+  let check_word (automaton : t) 
+                 (word : lt list) : bool =
+    let end_states =
+      List.fold_left
+      (
+        fun (current_states : states) 
+            (letter : lt) : states ->
+          StateSet.fold
+          (
+            fun (s : state)
+                (next_states : states) : states ->
+              let next_states_for_s = TransSet.fold
+                (
+                  fun (s1, l, s2 : trans)
+                      (next_states_labeled_letter : states) : states ->
+                    if Int.compare s s1 = 0 && Lt.compare letter l = 0 then
+                      StateSet.add s2 next_states_labeled_letter
+                    else
+                      next_states_labeled_letter
+                )
+                automaton.trans StateSet.empty
+              in
+              StateSet.union next_states next_states_for_s
+          )
+          current_states StateSet.empty 
+      )
+      automaton.starts word
+    in
+    StateSet.exists (Fun.flip StateSet.mem @@ automaton.ends) end_states
+
 end

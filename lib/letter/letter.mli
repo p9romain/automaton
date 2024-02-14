@@ -1,4 +1,3 @@
-(* For the alphabet *)
 module type Symbol = sig
 
   type t
@@ -11,8 +10,10 @@ end
 module type Letter = sig
 
   type symbol
+  type t
 
-  include Symbol
+  val compare : t -> t -> int
+  val to_string : t -> string
 
   val epsilon : t
   val is_epsilon : t -> bool

@@ -1,4 +1,23 @@
-module type S = sig
+(* 
+
+TODO:
+
+Regex simple (Letter, Star, Union, Concat) et regex étendu (Letter, Star, Union (list), Concat (list), Option, Plus, etc...)
+
+Regex simple :
+  - setters
+  - equals?
+
+traduction littérale regex simple vers regex étendu
+
+Regex étendu :
+  - setters
+  - equals?
+  - simplification (avec flatten pour Union et Concat)
+
+*)
+
+(* module type S = sig
 
   type lt
   type t
@@ -32,4 +51,4 @@ module type S = sig
 
 end
 
-module Make (Lt : Letter.Letter) : S with type lt = Lt.t
+module Make (Lt : Letter.Letter) : S with type lt = Lt.t *)

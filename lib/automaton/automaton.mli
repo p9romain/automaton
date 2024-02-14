@@ -89,14 +89,14 @@ module type S = sig
   (* val minimize : t -> t *)
 
   (* [check_word automaton word] checks if [word] is recognized by [automaton] *)
-  (* val check_word : t -> lt list -> bool *)
-  (* [to_regex_mcn_yama automaton] returns the regex representing [automaton] using the McNaughton-Yamada method. 
+  val check_word : t -> lt list -> bool
+  (* [to_regex_my automaton] returns the regex representing [automaton] using the McNaughton-Yamada method. 
      The returned value might be unsimplified *)
-  (* val to_regex_mcn_yama : t -> regexp *)
-  (* [to_regex_brzo_mcc automaton] returns the regex representing [automaton] using the Brzozowski-McCluskey method,
+  (* val to_regex_my : t -> regexp *)
+  (* [to_regex_bm automaton] returns the regex representing [automaton] using the Brzozowski-McCluskey method,
       also know as the "state elimination method". 
      The returned value might be unsimplified *)
-  (* val to_regex_brzo_mcc : t -> regexp *)
+  (* val to_regex_bm : t -> regexp *)
   (* [from_regex reg alphabet] creates a NFA (Non-deterministic Finite Automaton) recognizing [reg] *)
   (* val from_regex : regexp -> lt list -> t *)
 
