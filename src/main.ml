@@ -45,3 +45,9 @@ let () = assert(A.check_word dfauto @@ List.map StringS.symbol @@ string_to_stri
 let () = assert(not @@ A.check_word dfauto @@ List.map StringS.symbol @@ string_to_string_list "")
 let () = assert(not @@ A.check_word dfauto @@ List.map StringS.symbol @@ string_to_string_list "aabbaaba")
 let () = assert(A.check_word dfauto @@ List.map StringS.symbol @@ string_to_string_list "abababaaabbababbaababbaaababaabbbababbabbababababbababb")
+
+module Regex = Regexp.Make(StringS)
+
+let r = Regex.(simp_to_ext @@ concat (letter "a") @@ concat (letter "a") @@ union (letter "b") @@ concat (union (union (letter "b") @@ concat (union (letter "a") @@ letter "b") @@ letter "a") @@ letter "b") @@ letter "a")
+let () = Printf.printf "%s\n" @@ Regex.(to_string r)
+let () = Printf.printf "%s\n" @@ Regex.(to_string @@ simplify r)

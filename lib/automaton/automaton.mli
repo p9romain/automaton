@@ -1,6 +1,8 @@
 module type S = sig
 
+  (* The letter type *)
   type lt
+  (* The automaton type *)
   type t
 
   (* The empty automaton *)
