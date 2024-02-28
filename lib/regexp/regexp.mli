@@ -16,14 +16,14 @@ module type S = sig
   (* [star r] creates a regex with the Kleene star *)
   val star : t_simp -> t_simp
 
+  (* [to_string r] cast the regex [r] into a string *)
+  val to_string : t_ext -> string
+
   (* [simp_to_ext r] extends the simple regex [r], in order to simplify or print it *)
   val simp_to_ext : t_simp -> t_ext
 
   (* [simplify r] normalizes and simplfies the regex [r] as much as possible *)
   val simplify : t_ext -> t_ext
-
-  (* [to_string r] cast the regex [r] into a string *)
-  val to_string : t_ext -> string
 
 end
 

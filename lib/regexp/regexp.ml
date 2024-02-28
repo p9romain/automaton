@@ -9,11 +9,11 @@ module type S = sig
   val union : t_simp -> t_simp -> t_simp
   val star : t_simp -> t_simp
 
-  val simp_to_ext : t_simp -> t_ext
-  
-  val simplify : t_ext -> t_ext
-
   val to_string : t_ext -> string
+  
+  val simp_to_ext : t_simp -> t_ext
+
+  val simplify : t_ext -> t_ext
 
 end
 
@@ -21,10 +21,10 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
 
   type lt = Lt.t
   type t_simp =
-    | Letter of lt
-    | Concat of t_simp * t_simp
-    | Union of t_simp * t_simp
-    | Star of t_simp
+    | S_Letter of lt
+    | S_Concat of t_simp * t_simp
+    | S_Union of t_simp * t_simp
+    | S_Star of t_simp
   type t_ext =
     | Letter of lt
     | Concat of t_ext list
@@ -36,27 +36,56 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
 
 
   let letter (l : lt) : t_simp =
-    Letter l
+    S_Letter l
 
   let concat (r1 : t_simp) 
              (r2 : t_simp) : t_simp =
-    Concat (r1, r2)
+    S_Concat (r1, r2)
 
   let union (r1 : t_simp) 
             (r2 : t_simp) : t_simp =
-    Union (r1, r2)
+    S_Union (r1, r2)
 
   let star (r : t_simp) : t_simp =
-    Star r
+    S_Star r
 
+
+
+  let rec to_string (r : t_ext) : string =
+    match r with
+    | Letter l ->
+      Lt.to_string l
+    | Concat l ->
+      String.concat "" @@ List.map to_string l
+    | Union l ->
+      "(" ^ (String.concat "|" @@ List.map to_string l) ^ ")"
+    | Star r ->
+      let s = to_string r in
+      if String.length s = 1 then
+        s ^ "*"
+      else
+        "(" ^ s ^ ")*"
+    | Plus r ->
+      let s = to_string r in
+      if String.length s = 1 then
+        s ^ "⁺"
+      else
+        "(" ^ s ^ ")⁺"
+    | Option r ->
+      let s = to_string r in
+      if String.length s = 1 then
+        s ^ "?"
+      else
+        "(" ^ s ^ ")?"
+ 
 
 
   let rec simp_to_ext (r : t_simp) : t_ext =
     match r with
-    | Letter l -> Letter l
-    | Concat (r1, r2) -> Concat [simp_to_ext r1; simp_to_ext r2]
-    | Union (r1, r2) -> Union [simp_to_ext r1; simp_to_ext r2]
-    | Star r -> Star (simp_to_ext r)
+    | S_Letter l -> Letter l
+    | S_Concat (r1, r2) -> Concat [simp_to_ext r1; simp_to_ext r2]
+    | S_Union (r1, r2) -> Union [simp_to_ext r1; simp_to_ext r2]
+    | S_Star r -> Star (simp_to_ext r)
 
 
 
@@ -101,63 +130,87 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
         let l = List.map simp l in
         let rec loop (l : t_ext list) : t_ext list =
           match l with
-          | [] -> []
-          | r :: [] -> r :: []
+          | []
+          | _ :: [] -> l
           | r1 :: r2 :: l ->
-            begin
-              match r1, r2 with
-              | Star rr1, Star rr2 ->
-                if rr1 = rr2 then
-                  Star rr1 :: loop l
-                else
-                  List.cons r1 @@ loop @@ r2 :: l
-              | Star rr1, rr2 ->
-                if rr1 = rr2 then
-                  Plus rr1 :: loop l
-                else
-                  List.cons r1 @@ loop @@ r2 :: l
-              | rr1, Star rr2 ->
-                if rr1 = rr2 then
-                  Plus rr1 :: loop l
-                else
-                  List.cons r1 @@ loop @@ r2 :: l
-              | _ -> 
+            match r1, r2 with
+            | Star rr1, Star rr2 ->
+              if rr1 = rr2 then
+                Star rr1 :: loop l
+              else
                 List.cons r1 @@ loop @@ r2 :: l
-            end
+            | Star rr1, rr2 ->
+              if rr1 = rr2 then
+                loop @@ List.cons (simp @@ Plus rr1) l
+              else
+                List.cons r1 @@ loop @@ r2 :: l
+            | rr1, Star rr2 ->
+              if rr1 = rr2 then
+                loop @@ List.cons (simp @@ Plus rr1) l
+              else
+                List.cons r1 @@ loop @@ r2 :: l
+            | Plus rr1, rr2 ->
+              if rr1 = rr2 then
+                List.cons r2 @@ loop @@ r1 :: l
+              else
+                List.cons r1 @@ loop @@ r2 :: l
+            | Letter lt, rr2 ->
+              if Lt.is_epsilon lt then
+                rr2 :: loop l
+              else
+                List.cons r1 @@ loop @@ r2 :: l
+            | rr1, Letter lt ->
+              if Lt.is_epsilon lt then
+                rr1 :: loop l
+              else
+                List.cons r1 @@ loop @@ r2 :: l
+            | _ ->
+              List.cons r1 @@ loop @@ r2 :: l
         in
-        Concat (loop l)
-      | _ -> r
+        (* Do I double check in the two directions?, like doing something like 
+          Concat (List.rev @@ loop @@ List.rev @@ loop @@ l)
+
+          Kinda cursed buuuuuut...................................... Can help, maybe I'll try, once
+          Later.
+        *)
+        Concat (loop l) 
+      | Union l ->
+        (* TODO : the hardest because commutativity..... *)
+        Union l
+      | Star r ->
+        begin
+          match simp r with
+          | Letter l ->
+            if Lt.is_epsilon l then
+              Letter l
+            else
+              Star r
+          | Star r
+          | Plus r
+          | Option r -> Star r
+          | r -> Star r
+        end
+      | Plus r ->
+        begin
+          match simp r with
+          | Letter l ->
+            if Lt.is_epsilon l then
+              Letter l
+            else
+              Plus r
+          | Star r
+          | Option r -> Star r
+          | Plus r -> Plus r
+          | r -> Plus r
+        end
+      | Option r ->
+        begin
+          match simp r with
+          | Star r
+          | Plus r -> Star r
+          | r -> Option r
+        end
     in
-    (* simp @@ flatten r *)
-    flatten r
-
-
-
-  let rec to_string (r : t_ext) : string =
-    match r with
-    | Letter l ->
-      Lt.to_string l
-    | Concat l ->
-      String.concat "" @@ List.map to_string l
-    | Union l ->
-      "(" ^ (String.concat "|" @@ List.map to_string l) ^ ")"
-    | Star r ->
-      let s = to_string r in
-      if String.length s = 1 then
-        s ^ "*"
-      else
-        "(" ^ s ^ ")*"
-    | Plus r ->
-      let s = to_string r in
-      if String.length s = 1 then
-        s ^ "⁺"
-      else
-        "(" ^ s ^ ")⁺"
-    | Option r ->
-      let s = to_string r in
-      if String.length s = 1 then
-        s ^ "?"
-      else
-        "(" ^ s ^ ")?"
+    simp @@ flatten r
 
 end
