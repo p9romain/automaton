@@ -4,6 +4,8 @@ module type S = sig
   type lt
   (* The automaton type *)
   type t
+  (* The regexp type *)
+  type regexp
 
   (* The empty automaton *)
   val empty : t
@@ -98,7 +100,7 @@ module type S = sig
   (* [to_regex_bm automaton] returns the regex representing [automaton] using the Brzozowski-McCluskey method,
       also know as the "state elimination method". 
      The returned value might be unsimplified *)
-  (* val to_regex_bm : t -> regexp *)
+  val to_regex_bm : t -> regexp
   (* [from_regex reg alphabet] creates a NFA (Non-deterministic Finite Automaton) recognizing [reg] *)
   (* val from_regex : regexp -> lt list -> t *)
 

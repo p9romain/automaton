@@ -2,6 +2,7 @@ module type S = sig
 
   type lt
   type t
+  type regexp
 
   val empty : t
   val create : lt list -> t
@@ -35,7 +36,7 @@ module type S = sig
   val check_word : t -> lt list -> bool
 
   (* val to_regex_my : t -> regexp *)
-  (* val to_regex_bm : t -> regexp *)
+  val to_regex_bm : t -> regexp
   (* val from_regex : regexp -> lt list -> t *)
 
 end
@@ -44,9 +45,10 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
 
   type lt = Lt.t
 
+
+
   module LetterSet = Set.Make(Lt)
   type alphabet = LetterSet.t
-
 
   type state = int
   module StateSet = Set.Make(Int)
@@ -94,7 +96,6 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
   module TransSet = Set.Make(Trans)
   type transitions = TransSet.t
 
-
   type t = { 
               alphabet : alphabet ; 
               states : states ; 
@@ -103,17 +104,22 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
               ends : states ;
            }
 
+
+
+  module R = Regexp.Make(Lt)
+  type regexp = R.t_simp
+
   (* ================================================================= *)
   (* ================================================================= *)
   (* ================================================================= *)
 
-  let get_transition_from (automaton : t) 
+  let get_transition_from (trans : transitions) 
                           (state : state) : transitions =
     TransSet.filter (
       fun (state', _, _) -> 
         Int.compare state state' = 0
     ) 
-    automaton.trans
+    trans
 
   (* ================================================================= *)
   (* ================================================================= *)
@@ -314,7 +320,7 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
     StateSet.for_all (
       fun state ->
         (* Get all transitions from the state *)
-        let transitions = get_transition_from automaton state in
+        let transitions = get_transition_from automaton.trans state in
         (* Sort all the letters to see if there is more than once a letter *)
         let letters = List.sort Lt.compare @@ TransSet.fold (
           fun (_, letter, _ : trans)
@@ -350,7 +356,7 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
 
   let determinize (automaton : t) : t =
     (* Only one start state (state nb = min-1)*)
-    let start_state = -1 + StateSet.fold min automaton.states 1
+    let start_state = -1 + StateSet.fold min automaton.states 0
     in
     (* Add it as a new state *)
     let automaton = add_state automaton start_state in
@@ -378,7 +384,7 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
         let rec get_accessible_states_with_eps_trans (state1 : state) 
                                                      (acc, already_done : states * states) : states =
           (* all transitions *)
-          let transitions = get_transition_from automaton state1 in
+          let transitions = get_transition_from automaton.trans state1 in
           (* keep only the eps transitions *)
           let transitions = TransSet.filter (
             fun (_, letter, _ : trans) : bool -> 
@@ -452,7 +458,7 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
             let next_states = StateSet.fold (
               fun state1 acc ->
                 (* Get all transitions *)
-                let transitions = get_transition_from automaton state1 in
+                let transitions = get_transition_from automaton.trans state1 in
                 (* All transitions labelled [letter] *)
                 let transitions = TransSet.filter (
                   fun (_, letter', _ : trans) : bool -> 
@@ -591,5 +597,49 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
       automaton.starts word
     in
     StateSet.exists (Fun.flip StateSet.mem @@ automaton.ends) end_states
+
+  let to_regex_my (_automaton: t) : regexp =
+    R.letter Lt.epsilon
+
+  let to_regex_bm (automaton: t) : regexp =
+    let _ = 0
+    in
+    (* Only one start state (state nb = min - 1)*)
+    let start_state = -1 + StateSet.fold min automaton.states 0
+    in
+    (* Add it as a new state *)
+    let automaton = add_state automaton start_state in
+    (* Link the new start state with previous start states *)
+    let automaton = StateSet.fold (
+      fun (state : state)
+          (automaton : t) : t ->
+        add_trans automaton start_state Lt.epsilon state
+    ) 
+    automaton.starts automaton 
+    in
+    (* Removes old start states *)
+    let automaton = { automaton with starts = StateSet.empty } in
+    (* Add new start state *)
+    let automaton = add_start automaton start_state 
+    in
+    (* Only one end state (state nb = max + 1)*)
+    let end_state = 1 + StateSet.fold max automaton.states 0
+    in
+    (* Add it as a new state *)
+    let automaton = add_state automaton end_state in
+    (* Link the new end state with previous end states *)
+    let automaton = StateSet.fold (
+      fun (state : state)
+          (automaton : t) : t ->
+        add_trans automaton state Lt.epsilon end_state
+    ) 
+    automaton.ends automaton 
+    in
+    (* Removes old end states *)
+    let automaton = { automaton with ends = StateSet.empty } in
+    (* Add new end state *)
+    let automaton = add_end automaton end_state 
+    in
+    R.letter Lt.epsilon
 
 end
