@@ -7,6 +7,11 @@ module type S = sig
   (* An extended version of the regex (with the option and plus) *)
   type t_ext
 
+  (* The empty regex *)
+  val empty : t_simp
+  (* [is_empty r] checks if the regexp is the empty (not the empty word : ɛ ≠ ∅) *)
+  val is_empty : t_simp -> bool
+
   (* [letter l] creates a regex with the letter [l] *)
   val letter : lt -> t_simp
   (* [concat r1 r2] creates a regex by concatenating [r1] with [r2] *)

@@ -4,6 +4,9 @@ module type S = sig
   type t_simp
   type t_ext
 
+  val empty : t_simp
+  val is_empty : t_simp -> bool
+
   val letter : lt -> t_simp
   val concat : t_simp -> t_simp -> t_simp
   val union : t_simp -> t_simp -> t_simp
@@ -21,6 +24,7 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
 
   type lt = Lt.t
   type t_simp =
+    | S_Empty
     | S_Letter of lt
     | S_Concat of t_simp * t_simp
     | S_Union of t_simp * t_simp
@@ -32,6 +36,13 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
     | Star of t_ext
     | Plus of t_ext
     | Option of t_ext
+
+
+
+  let empty = S_Empty
+
+  let is_empty (r : t_simp) : bool =
+    r = empty
 
 
 
@@ -82,6 +93,7 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
 
   let rec simp_to_ext (r : t_simp) : t_ext =
     match r with
+    | S_Empty -> failwith "Can't convert the empty regex"
     | S_Letter l -> Letter l
     | S_Concat (r1, r2) -> Concat [simp_to_ext r1; simp_to_ext r2]
     | S_Union (r1, r2) -> Union [simp_to_ext r1; simp_to_ext r2]

@@ -2,6 +2,8 @@ module type S = sig
 
   type lt
   type t
+
+  module R : Regexp.S
   type regexp
 
   val empty : t
@@ -35,13 +37,15 @@ module type S = sig
   
   val check_word : t -> lt list -> bool
 
-  (* val to_regex_my : t -> regexp *)
+  val to_regex_my : t -> regexp
   val to_regex_bm : t -> regexp
   (* val from_regex : regexp -> lt list -> t *)
 
 end
 
-module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
+module Make (Lt : Letter.Letter) : S with type lt = Lt.t 
+                                      and module R = Regexp.Make(Lt) 
+                                      and type regexp = Regexp.Make(Lt).t_simp = struct
 
   type lt = Lt.t
 
@@ -81,13 +85,13 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
 
     let compare (state1, letter, state2 : t) 
                 (state1', letter', state2' : t) : int =
-      let c1 = Int.compare state1 state1' in
+      let c1 = compare state1 state1' in
       match c1 with
       | 0 ->
         begin
           let c2 = Lt.compare letter letter' in
           match c2 with
-          | 0 -> Int.compare state2 state2'
+          | 0 -> compare state2 state2'
           | _ -> c2
         end
       | _ -> c1
@@ -117,9 +121,19 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
                           (state : state) : transitions =
     TransSet.filter (
       fun (state', _, _) -> 
-        Int.compare state state' = 0
+        state = state'
     ) 
     trans
+
+  let get_transition_between (trans : transitions) 
+                             (state1 : state)
+                             (state2 : state) : transitions =
+    TransSet.filter (
+        fun (state1', _, state2') -> 
+          state1 = state1'
+          && state2 = state2'
+      ) 
+      trans
 
   (* ================================================================= *)
   (* ================================================================= *)
@@ -231,7 +245,7 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
                                (state2 : state) : t =
     let transitions = TransSet.filter (
       fun (s1, _, s2 : trans) : bool -> 
-        Int.compare state1 s1 <> 0 || Int.compare state2 s2 <> 0 
+        state1 <> s1 || state2 <> s2 
       ) 
       automaton.trans
     in
@@ -282,23 +296,13 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
         Printf.fprintf file "  %d [peripheries=2] ;\n" state 
     ) 
     automaton.ends ;
-    let get_transition_between (trans : transitions) 
-                               (state1 : state)
-                               (state2 : state) : trans list =
-      TransSet.to_list 
-        @@ TransSet.filter (
-          fun (state1', _, state2') -> 
-            Int.compare state1 state1' = 0
-            && Int.compare state2 state2' = 0
-        ) 
-        trans
-    in
     (* Not TransSet iter because I want to merge all transitions between two states *)
     StateSet.iter (
       fun (state1 : state) : unit ->
         StateSet.iter (
           fun (state2 : state) : unit ->
             let letters = List.map (fun (_, letter, _ : trans) : string -> Lt.to_string letter) 
+              @@ TransSet.to_list 
               @@ get_transition_between automaton.trans state1 state2 
             in
             let letter = String.concat ", " letters in
@@ -583,7 +587,7 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
                 (
                   fun (s1, l, s2 : trans)
                       (next_states_labeled_letter : states) : states ->
-                    if Int.compare s s1 = 0 && Lt.compare letter l = 0 then
+                    if s = s1 && Lt.compare letter l = 0 then
                       StateSet.add s2 next_states_labeled_letter
                     else
                       next_states_labeled_letter
@@ -598,8 +602,145 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
     in
     StateSet.exists (Fun.flip StateSet.mem @@ automaton.ends) end_states
 
-  let to_regex_my (_automaton: t) : regexp =
-    R.letter Lt.epsilon
+  let to_regex_my (automaton: t) : regexp =
+    (* States renaming *)
+    let hash = Hashtbl.create 16 in
+    let i = ref 1 in
+    let () = StateSet.iter (
+      fun (s : state) : unit ->
+        Hashtbl.add hash s !i ;
+        incr i 
+    )
+    automaton.states
+    in
+    let replace_states (states : states) : states =
+      StateSet.map (
+        fun (s : state) : state ->
+          Hashtbl.find hash s
+      )
+      states
+    in
+    let states = replace_states automaton.states in
+    let starts = replace_states automaton.starts in
+    let ends = replace_states automaton.ends in
+    let trans = TransSet.map (
+      fun (s1, l, s2 : trans) : trans ->
+        (Hashtbl.find hash s1, l, Hashtbl.find hash s2)
+    )
+    automaton.trans
+    in
+    let automaton = { automaton with states ; starts ; ends ; trans } in
+    (* McNaughton-Yamada algorithm *)
+    let n = StateSet.cardinal automaton.states in
+    let mat1 = Array.init n (
+      fun (i : state) : regexp array ->
+        let line = Array.make n R.empty in
+        let () = Array.mapi_inplace (
+          fun (j : state) 
+              (_ : regexp) : regexp ->
+            let transitions = get_transition_between automaton.trans (i+1) (j+1) in
+            TransSet.fold (
+              fun (_, l, _ : trans)
+                  (acc : regexp) : regexp ->
+                if R.is_empty acc then
+                  R.letter l
+                else
+                  R.union acc @@ R.letter l
+            )
+            transitions R.empty
+        ) 
+        line 
+        in
+        line
+    )
+    in
+    let print_matrix mat = 
+      Array.iter (
+        fun (line : regexp array) : unit ->
+          Printf.printf "[%s];\n" @@ String.concat "; " @@ List.map (fun r -> try R.(to_string @@ simp_to_ext r) with _ -> "Null") @@ List.of_seq @@ Array.to_seq line
+      )
+      mat
+    in
+    let () = print_matrix mat1 in
+    let mat2 = Array.make_matrix n n R.empty in
+    let choose_mat = ref true in
+    let () =
+      for k = 0 to n-1 do
+        for p = 0 to n-1 do
+          for q = 0 to n-1 do
+            let algo (mat : regexp array array)
+                     (mat' : regexp array array) : unit =
+              mat'.(p).(q) <-
+                if R.is_empty mat.(p).(k) || R.is_empty mat.(k).(q) then
+                  mat.(p).(q)
+                else if R.is_empty mat.(p).(q) then
+                  if R.is_empty mat.(k).(k) then
+                    R.letter Lt.epsilon
+                  else
+                    R.(
+                         concat mat.(p).(k) 
+                      @@ concat (star mat.(k).(k)) mat.(k).(q)
+                    )
+                else if k = p then
+                  R.(concat (star mat.(p).(p)) mat.(p).(q))
+                else if k = q then
+                  R.(
+                       concat mat.(p).(q)
+                    @@ star mat.(q).(q)
+                  )
+                else
+                  R.(
+                       union mat.(p).(q) 
+                    @@ concat mat.(p).(k) 
+                    @@ concat (star mat.(k).(k)) mat.(k).(q)
+                  )
+            in
+            (* instead of doing copies, i read and write alternately in two matrixes *)
+            let () =
+              if !choose_mat then
+                algo mat1 mat2
+              else
+                algo mat2 mat1
+            in
+            choose_mat := not !choose_mat
+          done
+        done ;
+        print_endline "" ;
+        if !choose_mat then
+          print_matrix mat2
+        else
+          print_matrix mat1
+      done
+    in
+    StateSet.fold (
+      fun (start : state)
+          (acc : regexp) : regexp ->
+        StateSet.fold (
+          fun (end_state : state)
+              (acc' : regexp) : regexp ->
+            if start = end_state then
+              R.(
+                   union acc' 
+                @@ union (letter Lt.epsilon) (
+                  if !choose_mat then 
+                    mat1.(start-1).(end_state-1) 
+                  else 
+                    mat2.(start-1).(end_state-1)
+                )
+              )
+            else
+              R.(
+                  union acc' (
+                  if !choose_mat then 
+                    mat1.(start-1).(end_state-1) 
+                  else 
+                    mat2.(start-1).(end_state-1)
+                )
+              )
+        )
+        automaton.ends acc
+    )
+    automaton.starts R.empty
 
   let to_regex_bm (automaton: t) : regexp =
     let _ = 0
@@ -638,7 +779,7 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
     (* Removes old end states *)
     let automaton = { automaton with ends = StateSet.empty } in
     (* Add new end state *)
-    let automaton = add_end automaton end_state 
+    let _automaton = add_end automaton end_state 
     in
     R.letter Lt.epsilon
 

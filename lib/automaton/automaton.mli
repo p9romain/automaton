@@ -4,6 +4,9 @@ module type S = sig
   type lt
   (* The automaton type *)
   type t
+
+  (* The regexp module *)
+  module R : Regexp.S
   (* The regexp type *)
   type regexp
 
@@ -96,7 +99,7 @@ module type S = sig
   val check_word : t -> lt list -> bool
   (* [to_regex_my automaton] returns the regex representing [automaton] using the McNaughton-Yamada method. 
      The returned value might be unsimplified *)
-  (* val to_regex_my : t -> regexp *)
+  val to_regex_my : t -> regexp
   (* [to_regex_bm automaton] returns the regex representing [automaton] using the Brzozowski-McCluskey method,
       also know as the "state elimination method". 
      The returned value might be unsimplified *)
@@ -106,4 +109,6 @@ module type S = sig
 
 end
 
-module Make (Lt : Letter.Letter) : S with type lt = Lt.t
+module Make (Lt : Letter.Letter) : S with type lt = Lt.t 
+                                      and module R = Regexp.Make(Lt) 
+                                      and type regexp = Regexp.Make(Lt).t_simp
