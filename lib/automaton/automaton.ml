@@ -639,29 +639,34 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t
           fun (j : state) 
               (_ : regexp) : regexp ->
             let transitions = get_transition_between automaton.trans (i+1) (j+1) in
-            TransSet.fold (
+            let regex = TransSet.fold (
               fun (_, l, _ : trans)
                   (acc : regexp) : regexp ->
-                if R.is_empty acc then
-                  R.letter l
-                else
-                  R.union acc @@ R.letter l
+                R.(
+                  if is_empty acc then
+                    letter l
+                  else
+                    union acc @@ letter l
+                )
             )
             transitions R.empty
+            in
+            if TransSet.is_empty transitions then
+              if i == j then
+                R.letter Lt.epsilon
+              else
+                regex
+            else
+              if i == j && not @@ TransSet.mem (i, Lt.epsilon, j) transitions then
+                R.(union regex @@ letter Lt.epsilon)
+              else
+                regex
         ) 
         line 
         in
         line
     )
     in
-    let print_matrix mat = 
-      Array.iter (
-        fun (line : regexp array) : unit ->
-          Printf.printf "[%s];\n" @@ String.concat "; " @@ List.map (fun r -> try R.(to_string @@ simp_to_ext r) with _ -> "Null") @@ List.of_seq @@ Array.to_seq line
-      )
-      mat
-    in
-    let () = print_matrix mat1 in
     let mat2 = Array.make_matrix n n R.empty in
     let choose_mat = ref true in
     let () =
@@ -696,47 +701,58 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t
                   )
             in
             (* instead of doing copies, i read and write alternately in two matrixes *)
-            let () =
-              if !choose_mat then
-                algo mat1 mat2
-              else
-                algo mat2 mat1
-            in
-            choose_mat := not !choose_mat
+            if !choose_mat then
+              algo mat1 mat2
+            else
+              algo mat2 mat1
           done
         done ;
-        print_endline "" ;
-        if !choose_mat then
-          print_matrix mat2
-        else
-          print_matrix mat1
+        choose_mat := not !choose_mat
       done
     in
     StateSet.fold (
-      fun (start : state)
+      fun (start_state : state)
           (acc : regexp) : regexp ->
         StateSet.fold (
           fun (end_state : state)
               (acc' : regexp) : regexp ->
-            if start = end_state then
-              R.(
-                   union acc' 
-                @@ union (letter Lt.epsilon) (
-                  if !choose_mat then 
-                    mat1.(start-1).(end_state-1) 
-                  else 
-                    mat2.(start-1).(end_state-1)
+            if R.is_empty acc' then
+              if start_state = end_state then
+                R.(
+                    union (letter Lt.epsilon) (
+                    if !choose_mat then 
+                      mat1.(start_state-1).(end_state-1) 
+                    else 
+                      mat2.(start_state-1).(end_state-1)
+                  )
                 )
-              )
+              else
+                R.(
+                  if !choose_mat then 
+                    mat1.(start_state-1).(end_state-1) 
+                  else 
+                    mat2.(start_state-1).(end_state-1)
+                )
             else
-              R.(
-                  union acc' (
-                  if !choose_mat then 
-                    mat1.(start-1).(end_state-1) 
-                  else 
-                    mat2.(start-1).(end_state-1)
+              if start_state = end_state then
+                R.(
+                     union acc' 
+                  @@ union (letter Lt.epsilon) (
+                    if !choose_mat then 
+                      mat1.(start_state-1).(end_state-1) 
+                    else 
+                      mat2.(start_state-1).(end_state-1)
+                  )
                 )
-              )
+              else
+                R.(
+                    union acc' (
+                    if !choose_mat then 
+                      mat1.(start_state-1).(end_state-1) 
+                    else 
+                      mat2.(start_state-1).(end_state-1)
+                  )
+                )
         )
         automaton.ends acc
     )

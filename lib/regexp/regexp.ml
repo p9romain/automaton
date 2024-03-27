@@ -1,6 +1,7 @@
 module type S = sig
 
   type lt
+
   type t_simp
   type t_ext
 
@@ -12,9 +13,9 @@ module type S = sig
   val union : t_simp -> t_simp -> t_simp
   val star : t_simp -> t_simp
 
-  val to_string : t_ext -> string
-  
   val simp_to_ext : t_simp -> t_ext
+  
+  val to_string : t_ext -> string
 
   val simplify : t_ext -> t_ext
 
@@ -23,6 +24,7 @@ end
 module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
 
   type lt = Lt.t
+
   type t_simp =
     | S_Empty
     | S_Letter of lt
@@ -59,35 +61,6 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
 
   let star (r : t_simp) : t_simp =
     S_Star r
-
-
-
-  let rec to_string (r : t_ext) : string =
-    match r with
-    | Letter l ->
-      Lt.to_string l
-    | Concat l ->
-      String.concat "" @@ List.map to_string l
-    | Union l ->
-      "(" ^ (String.concat "|" @@ List.map to_string l) ^ ")"
-    | Star r ->
-      let s = to_string r in
-      if String.length s = 1 then
-        s ^ "*"
-      else
-        "(" ^ s ^ ")*"
-    | Plus r ->
-      let s = to_string r in
-      if String.length s = 1 then
-        s ^ "⁺"
-      else
-        "(" ^ s ^ ")⁺"
-    | Option r ->
-      let s = to_string r in
-      if String.length s = 1 then
-        s ^ "?"
-      else
-        "(" ^ s ^ ")?"
  
 
 
@@ -101,41 +74,72 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
 
 
 
-  let simplify (r : t_ext) : t_ext =
-    let rec flatten (r : t_ext) : t_ext =
-      match r with
-      | Letter _ -> r
-      | Concat l ->
-        let rec loop (l : t_ext list) : t_ext list =
-          match l with
-          | [] -> []
-          | r :: l ->
-            begin
-              match r with
-              | Concat ll ->
-                List.append ll @@ loop l
-              | _ -> r :: loop l
-            end
-        in
-        Concat (loop @@ List.map flatten l)
-      | Union l ->
-        let rec loop (l : t_ext list) : t_ext list =
-          match l with
-          | [] -> []
-          | r :: l ->
-            begin
-              match r with
-              | Union ll ->
-                List.append ll @@ loop l
-              | _ -> r :: loop l
-            end
-        in
-        Union (loop @@ List.map flatten l)
-      | Star r -> Star (flatten r)
-      | Plus r -> Plus (flatten r)
-      | Option r -> Option (flatten r)
+  let rec flatten (r : t_ext) : t_ext =
+    match r with
+    | Letter _ -> r
+    | Concat l ->
+      let rec loop (l : t_ext list) : t_ext list =
+        match l with
+        | [] -> []
+        | r :: l ->
+          begin
+            match r with
+            | Concat ll ->
+              List.append ll @@ loop l
+            | _ -> r :: loop l
+          end
+      in
+      Concat (loop @@ List.map flatten l)
+    | Union l ->
+      let rec loop (l : t_ext list) : t_ext list =
+        match l with
+        | [] -> []
+        | r :: l ->
+          begin
+            match r with
+            | Union ll ->
+              List.append ll @@ loop l
+            | _ -> r :: loop l
+          end
+      in
+      Union (loop @@ List.map flatten l)
+    | Star r -> Star (flatten r)
+    | Plus r -> Plus (flatten r)
+    | Option r -> Option (flatten r)
 
-    and simp (r : t_ext) : t_ext =
+  let to_string (r : t_ext) : string =
+    let rec loop (r : t_ext) : string =
+      match r with
+      | Letter l ->
+        Lt.to_string l
+      | Concat l ->
+        String.concat "" @@ List.map loop l
+      | Union l ->
+        "(" ^ (String.concat "|" @@ List.map loop l) ^ ")"
+      | Star r ->
+        let s = loop r in
+        if String.length s = 1 then
+          s ^ "*"
+        else
+          "(" ^ s ^ ")*"
+      | Plus r ->
+        let s = loop r in
+        if String.length s = 1 then
+          s ^ "⁺"
+        else
+          "(" ^ s ^ ")⁺"
+      | Option r ->
+        let s = loop r in
+        if String.length s = 1 then
+          s ^ "?"
+        else
+          "(" ^ s ^ ")?"
+    in
+    loop @@ flatten r
+
+
+  let simplify (r : t_ext) : t_ext =
+    let rec simp (r : t_ext) : t_ext =
       match r with
       | Letter _ -> r
       | Concat l ->

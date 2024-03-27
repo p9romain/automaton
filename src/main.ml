@@ -6,7 +6,7 @@ module StringS = struct
   let compare : t -> t -> int = String.compare
   let to_string (s : t) : string = s
 
-  let epsilon = ""
+  let epsilon = "EPS"
   let is_epsilon (s : t) : bool = 
     s = epsilon
 
@@ -25,32 +25,42 @@ module A = Automaton.Make(StringS)
 
 (* (a|b)*bb *)
 let nfa = A.create @@ List.map StringS.symbol ["a"; "b"]
-let nfa = A.add_states nfa [1; 2; 3]
-let nfa = A.add_start nfa 1
+let nfa = A.add_states nfa [0; 5; 3]
+let nfa = A.add_start nfa 0
 let nfa = A.add_end nfa 3
-let nfa = A.add_transitions nfa [(1, StringS.symbol "a", 1); (1, StringS.symbol "b", 1); (1, StringS.symbol "b", 2); (2, StringS.symbol "b", 3)]
+let nfa = A.add_transitions nfa StringS.(
+    [
+      (0, symbol "a", 0); 
+      (0, symbol "b", 0); 
+      (0, symbol "b", 5); 
+      (5, symbol "b", 3)
+    ]
+  )
 let () = A.to_dot nfa "nfa"
 let () = assert(not @@ A.is_deterministic nfa)
 let dfa = A.determinize nfa
 let () = assert(A.is_deterministic dfa)
 let () = A.to_dot dfa "dfa"
 
-let () = assert(not @@ A.check_word nfa @@ List.map StringS.symbol @@ string_to_string_list "a")
-let () = assert(A.check_word nfa @@ List.map StringS.symbol @@ string_to_string_list "bb")
-let () = assert(not @@ A.check_word nfa @@ List.map StringS.symbol @@ string_to_string_list "")
-let () = assert(not @@ A.check_word nfa @@ List.map StringS.symbol @@ string_to_string_list "aabbaaba")
-let () = assert(A.check_word nfa @@ List.map StringS.symbol @@ string_to_string_list "abababaaabbababbaababbaaababaabbbababbabbababababbababb")
+let check_nfa (s : string) = A.check_word nfa @@ List.map StringS.symbol @@ string_to_string_list s
+let check_dfa (s : string) = A.check_word dfa @@ List.map StringS.symbol @@ string_to_string_list s
 
-let () = assert(not @@ A.check_word dfa @@ List.map StringS.symbol @@ string_to_string_list "a")
-let () = assert(A.check_word dfa @@ List.map StringS.symbol @@ string_to_string_list "bb")
-let () = assert(not @@ A.check_word dfa @@ List.map StringS.symbol @@ string_to_string_list "")
-let () = assert(not @@ A.check_word dfa @@ List.map StringS.symbol @@ string_to_string_list "aabbaaba")
-let () = assert(A.check_word dfa @@ List.map StringS.symbol @@ string_to_string_list "abababaaabbababbaababbaaababaabbbababbabbababababbababb")
+let () = assert(not @@ check_nfa "a")
+let () = assert(check_nfa "bb")
+let () = assert(not @@ check_nfa "")
+let () = assert(not @@ check_nfa "aabbaaba")
+let () = assert(check_nfa "abababaaabbababbaababbaaababaabbbababbabbababababbababb")
+
+let () = assert(not @@ check_dfa "a")
+let () = assert(check_dfa "bb")
+let () = assert(not @@ check_dfa "")
+let () = assert(not @@ check_dfa "aabbaaba")
+let () = assert(check_dfa "abababaaabbababbaababbaaababaabbbababbabbababababbababb")
 
 module Regex = A.R
 
 let regexp_of_nfa = A.to_regex_my nfa
-(* let regexp_of_dfa = A.to_regex_my dfa *)
+let regexp_of_dfa = A.to_regex_my dfa
 
-let () = Printf.printf "NFA : %s" @@ Regex.(to_string @@ simp_to_ext regexp_of_nfa)
-(* let () = Printf.printf "DFA : %s" @@ Regex.(to_string @@ simp_to_ext regexp_of_dfa) *)
+let () = Printf.printf "NFA : %s\n" @@ Regex.(to_string @@ simp_to_ext regexp_of_nfa)
+let () = Printf.printf "DFA : %s\n" @@ Regex.(to_string @@ simp_to_ext regexp_of_dfa)
