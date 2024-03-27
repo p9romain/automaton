@@ -759,8 +759,6 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t
     automaton.starts R.empty
 
   let to_regex_bm (automaton: t) : regexp =
-    let _ = 0
-    in
     (* Only one start state (state nb = min - 1)*)
     let start_state = -1 + StateSet.fold min automaton.states 0
     in

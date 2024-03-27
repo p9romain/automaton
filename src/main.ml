@@ -63,4 +63,6 @@ let regexp_of_nfa = A.to_regex_my nfa
 let regexp_of_dfa = A.to_regex_my dfa
 
 let () = Printf.printf "NFA : %s\n" @@ Regex.(to_string @@ simp_to_ext regexp_of_nfa)
+let () = Printf.printf "NFA (simplified) : %s\n" @@ Regex.(to_string @@ simplify @@ simp_to_ext regexp_of_nfa)
 let () = Printf.printf "DFA : %s\n" @@ Regex.(to_string @@ simp_to_ext regexp_of_dfa)
+let () = Printf.printf "DFA (simplified) : %s\n" @@ Regex.(to_string @@ simplify @@ simp_to_ext regexp_of_dfa)

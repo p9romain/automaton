@@ -152,47 +152,61 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
             match r1, r2 with
             | Star rr1, Star rr2 ->
               if rr1 = rr2 then
-                Star rr1 :: loop l
+                loop @@ (Star rr1) :: l
               else
                 List.cons r1 @@ loop @@ r2 :: l
-            | Star rr1, rr2 ->
-              if rr1 = rr2 then
-                loop @@ List.cons (simp @@ Plus rr1) l
-              else
-                List.cons r1 @@ loop @@ r2 :: l
+            | Star rr1, rr2
             | rr1, Star rr2 ->
               if rr1 = rr2 then
-                loop @@ List.cons (simp @@ Plus rr1) l
+                loop @@ (simp @@ Plus rr1) :: l
               else
                 List.cons r1 @@ loop @@ r2 :: l
-            | Plus rr1, rr2 ->
-              if rr1 = rr2 then
-                List.cons r2 @@ loop @@ r1 :: l
-              else
-                List.cons r1 @@ loop @@ r2 :: l
-            | Letter lt, rr2 ->
+            | Letter lt1, Letter lt2 ->
+                if Lt.is_epsilon lt1 then
+                  loop @@ r2 :: l
+                else if Lt.is_epsilon lt2 then
+                  loop @@ r1 :: l
+                else
+                  List.cons r1 @@ loop @@ r2 :: l
+            | Letter lt, _ ->
               if Lt.is_epsilon lt then
-                rr2 :: loop l
+                loop @@ r2 :: l
               else
                 List.cons r1 @@ loop @@ r2 :: l
-            | rr1, Letter lt ->
+            | _, Letter lt ->
               if Lt.is_epsilon lt then
-                rr1 :: loop l
+                loop @@ r1 :: l
               else
                 List.cons r1 @@ loop @@ r2 :: l
             | _ ->
               List.cons r1 @@ loop @@ r2 :: l
         in
-        (* Do I double check in the two directions?, like doing something like 
-          Concat (List.rev @@ loop @@ List.rev @@ loop @@ l)
-
-          Kinda cursed buuuuuut...................................... Can help, maybe I'll try, once
-          Later.
-        *)
         Concat (loop l) 
       | Union l ->
-        (* TODO : the hardest because commutativity..... *)
-        Union l
+        (* TODO : the hardest because need to play with commutativity and associativity..... *)
+        let l = List.map simp l in
+        (
+          match l with
+          | [] -> failwith "Empty union is impossible"
+          | r :: [] -> r
+          | _ -> (
+            let (with_eps, without_eps) = List.partition (
+              fun (r : t_ext) : bool ->
+                match r with 
+                | Letter lt -> Lt.is_epsilon lt 
+                | _ -> false
+            ) 
+            l
+            in
+            match with_eps with 
+            | [] -> Union l
+            | _ -> 
+              match without_eps with
+              | [] -> Letter Lt.epsilon (* it was an union of espilon (why not) *)
+              | r :: [] -> simp (Option r)
+              | _ -> simp @@ Option (Union without_eps)
+          )
+        )
       | Star r ->
         begin
           match simp r with
