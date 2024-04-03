@@ -113,27 +113,24 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
       | Letter l ->
         Lt.to_string l
       | Concat l ->
-        String.concat "" @@ List.map loop l
+        String.concat ";" @@ List.map loop l
       | Union l ->
         "(" ^ (String.concat "|" @@ List.map loop l) ^ ")"
-      | Star r ->
-        let s = loop r in
-        if String.length s = 1 then
-          s ^ "*"
-        else
-          "(" ^ s ^ ")*"
-      | Plus r ->
-        let s = loop r in
-        if String.length s = 1 then
-          s ^ "+"
-        else
-          "(" ^ s ^ ")+"
-      | Option r ->
-        let s = loop r in
-        if String.length s = 1 then
-          s ^ "?"
-        else
-          "(" ^ s ^ ")?"
+      | Star r -> (
+          match r with
+          | Letter _ -> loop r ^ "*"
+          | _ -> "(" ^ loop r ^ ")*"
+        )
+      | Plus r -> (
+          match r with
+          | Letter _ -> loop r ^ "+"
+          | _ -> "(" ^ loop r ^ ")+"
+        )
+      | Option r -> (
+          match r with
+          | Letter _ -> loop r ^ "?"
+          | _ -> "(" ^ loop r ^ ")?"
+        )
     in
     loop @@ flatten r
 
@@ -181,7 +178,12 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
             | _ ->
               List.cons r1 @@ loop @@ r2 :: l
         in
-        Concat (loop l) 
+        ( 
+          match loop l with
+          | [] -> failwith "Empty concat is impossible"
+          | r :: [] -> r
+          | l -> Concat l 
+        )
       | Union l ->
         let l = List.map simp l in
         (
@@ -189,7 +191,7 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
           | [] -> failwith "Empty union is impossible"
           | r :: [] -> r
           | _ -> (
-            let (with_eps, without_eps) = List.partition (
+            let (all_eps, without_eps) = List.partition (
               fun (r : t_ext) : bool ->
                 match r with 
                 | Letter lt -> Lt.is_epsilon lt 
@@ -197,12 +199,12 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
             ) 
             l
             in
-            match with_eps with 
-            | [] -> Union l
-            | _ -> 
+            match all_eps with 
+            | [] -> Union l (* no epsilon *)
+            | _ -> (* at least one *)
               match without_eps with
               | [] -> Letter Lt.epsilon (* it was an union of espilon (why not) *)
-              | r :: [] -> simp (Option r)
+              | r :: [] -> simp @@ Option r
               | _ -> simp @@ Option (Union without_eps)
           )
         )
@@ -213,7 +215,7 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
             if Lt.is_epsilon l then
               Letter l
             else
-              Star r
+              Star (Letter l)
           | Star r
           | Plus r
           | Option r -> Star r
@@ -226,7 +228,7 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
             if Lt.is_epsilon l then
               Letter l
             else
-              Plus r
+              Plus (Letter l)
           | Star r
           | Option r -> Star r
           | Plus r -> Plus r
@@ -235,8 +237,14 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
       | Option r ->
         begin
           match simp r with
+          | Letter l ->
+            if Lt.is_epsilon l then
+              Letter l
+            else
+              Option (Letter l)
           | Star r
           | Plus r -> Star r
+          | Option r -> Option r
           | r -> Option r
         end
     in

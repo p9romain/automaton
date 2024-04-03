@@ -6,7 +6,7 @@ module S = struct
   let compare : t -> t -> int = String.compare
   let to_string (s : t) : string = s
 
-  let epsilon = "EPS"
+  let epsilon = "ε"
   let is_epsilon (s : t) : bool = 
     s = epsilon
 

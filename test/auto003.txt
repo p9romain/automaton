@@ -1,0 +1,6 @@
+type t3 = [ Bool;Bool+ ]
+3
+2
+0,Bool,1
+1,Bool,2
+2,Bool,2

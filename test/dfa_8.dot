@@ -1,0 +1,12 @@
+digraph automaton
+{
+  __INVISIBLE_NODE_0__ [label= "", shape=none,height=.0,width=.0] ;
+  __INVISIBLE_NODE_0__ -> 2 ;
+  1 [peripheries=2] ;
+  0 -> 0 [label="`A, `B"] ;
+  0 -> 1 [label="`C"] ;
+  1 -> 0 [label="`A, `B"] ;
+  1 -> 1 [label="`C"] ;
+  2 -> 0 [label="`A, `B"] ;
+  2 -> 1 [label="`C"] ;
+}

@@ -1,0 +1,7 @@
+type t2 = [ (Int|Bool)*; Int ]
+2
+1
+0,Bool,0
+0,Int,1
+1,Bool,0
+1,Int,1

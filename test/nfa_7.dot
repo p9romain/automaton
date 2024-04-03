@@ -1,0 +1,6 @@
+digraph automaton
+{
+  __INVISIBLE_NODE_0__ [label= "", shape=none,height=.0,width=.0] ;
+  __INVISIBLE_NODE_0__ -> 0 ;
+  0 [peripheries=2] ;
+}
