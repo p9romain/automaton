@@ -42,9 +42,9 @@ let () =
     let () = A.to_dot dfa (Printf.sprintf "test/dfa_%d" i) in
     let regexp_of_nfa = A.to_regex_my nfa in
     let regexp_of_dfa = A.to_regex_my dfa in
-    let () = Printf.printf "Regexp from file %s\n" regexp in
-    let () = Printf.printf "NFA : %s\n" @@ R.(to_string @@ simp_to_ext regexp_of_nfa) in
+    let () = Printf.printf "Regexp from file \"%s\"\n" regexp in
+    let () = Printf.printf "NFA              : %s\n" @@ R.(to_string @@ simp_to_ext regexp_of_nfa) in
     let () = Printf.printf "NFA (simplified) : %s\n" @@ R.(to_string @@ simplify @@ simp_to_ext regexp_of_nfa) in
-    let () = Printf.printf "DFA : %s\n" @@ R.(to_string @@ simp_to_ext regexp_of_dfa) in
+    let () = Printf.printf "DFA              : %s\n" @@ R.(to_string @@ simp_to_ext regexp_of_dfa) in
     Printf.printf "DFA (simplified) : %s\n\n" @@ R.(to_string @@ simplify @@ simp_to_ext regexp_of_dfa)
   done
