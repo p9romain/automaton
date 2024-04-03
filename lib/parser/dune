@@ -1,0 +1,4 @@
+(library
+  (name parser)
+  (libraries regexp automaton letter)
+)

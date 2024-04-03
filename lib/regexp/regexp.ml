@@ -125,9 +125,9 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
       | Plus r ->
         let s = loop r in
         if String.length s = 1 then
-          s ^ "⁺"
+          s ^ "+"
         else
-          "(" ^ s ^ ")⁺"
+          "(" ^ s ^ ")+"
       | Option r ->
         let s = loop r in
         if String.length s = 1 then
@@ -183,7 +183,6 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
         in
         Concat (loop l) 
       | Union l ->
-        (* TODO : the hardest because need to play with commutativity and associativity..... *)
         let l = List.map simp l in
         (
           match l with

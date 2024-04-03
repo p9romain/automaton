@@ -23,8 +23,6 @@ module type S = sig
   (* [add_trans automaton state1 letter state2] adds a transition labelled [letter] between [state1] and [state2] in [automaton].
 
      Raises : [state1] and [state2] must be [automaton]'s states.
-
-     [letter] is either [None] for an epsilon-transition, either [Some l] otherwise.
      Raises : [l] must be in the [automaton]'s alphabet.
 
      If the transition is already in [automaton], does nothing *)
