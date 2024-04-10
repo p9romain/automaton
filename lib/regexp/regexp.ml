@@ -118,21 +118,25 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
         "(" ^ (String.concat "|" @@ List.map loop l) ^ ")"
       | Star r -> (
           match r with
-          | Letter _ -> loop r ^ "*"
+          | Letter _
+          | Union _ -> loop r ^ "*"
           | _ -> "(" ^ loop r ^ ")*"
         )
       | Plus r -> (
           match r with
-          | Letter _ -> loop r ^ "+"
+          | Letter _
+          | Union _ -> loop r ^ "+"
           | _ -> "(" ^ loop r ^ ")+"
         )
       | Option r -> (
           match r with
-          | Letter _ -> loop r ^ "?"
+          | Letter _
+          | Union _ -> loop r ^ "?"
           | _ -> "(" ^ loop r ^ ")?"
         )
     in
     loop @@ flatten r
+
 
 
   let simplify (r : t_ext) : t_ext =
@@ -205,7 +209,9 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
               match without_eps with
               | [] -> Letter Lt.epsilon (* it was an union of espilon (why not) *)
               | r :: [] -> simp @@ Option r
-              | _ -> simp @@ Option (Union without_eps)
+              | _ -> 
+                let l = without_eps in
+                simp @@ Option (Union l)
           )
         )
       | Star r ->

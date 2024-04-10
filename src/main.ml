@@ -5,7 +5,7 @@ module A = Parser.A
 module R = A.R
 
 (* (a|b)*bb *)
-(* let (regexp, nfa) = Parser.parse_file "src/nfa.txt"
+let (regexp, nfa) = Parser.parse_file "src/nfa.txt"
 let () = assert(not @@ A.is_deterministic nfa)
 let dfa = A.determinize nfa
 let () = assert(A.is_deterministic dfa)
@@ -32,7 +32,9 @@ let () = Printf.printf "Regexp from file %s\n" regexp
 let () = Printf.printf "NFA : %s\n" @@ R.(to_string @@ simp_to_ext regexp_of_nfa)
 let () = Printf.printf "NFA (simplified) : %s\n" @@ R.(to_string @@ simplify @@ simp_to_ext regexp_of_nfa)
 let () = Printf.printf "DFA : %s\n" @@ R.(to_string @@ simp_to_ext regexp_of_dfa)
-let () = Printf.printf "DFA (simplified) : %s\n" @@ R.(to_string @@ simplify @@ simp_to_ext regexp_of_dfa) *)
+let () = Printf.printf "DFA (simplified) : %s\n" @@ R.(to_string @@ simplify @@ simp_to_ext regexp_of_dfa)
+
+let () = Printf.printf "\n\n\n"
 
 let () = 
   for i = 0 to 8 do
