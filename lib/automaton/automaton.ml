@@ -445,8 +445,8 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t
     let rec merge_transitions (states_to_do : states_set) 
                               (states_done : states_set) : unit =
       if not @@ StateSetSet.is_empty states_to_do then
-        let states = StateSetSet.choose states_to_do in
-        let states_to_do = StateSetSet.remove states states_to_do 
+        let choosen_states = StateSetSet.choose states_to_do in
+        let states_to_do = StateSetSet.remove choosen_states states_to_do 
         in
         (* i_transitions : (lt * states) list 
             = list of all possible next states
@@ -457,7 +457,8 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t
         let i_transitions, n_to_do = LetterSet.fold (
           (* For all letter *)
           fun (letter : lt)
-              (i_transitions, stack : (lt * states) list * states_set ) : ((lt * states) list * states_set) ->
+              (i_transitions, stack : (lt * states) list * states_set) 
+                : ((lt * states) list * states_set) ->
             (* For all states in states, we gather all the next states the accesible states with a transitions labelled letter *)
             let next_states = StateSet.fold (
               fun state1 acc ->
@@ -474,14 +475,14 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t
                 let next_states = TransSet.fold (
                   fun (_, _, state2 : trans)
                       (acc : states) : states ->
-                    StateSet.add state2 acc
+                    StateSet.union acc @@ Hashtbl.find eps_closure state2
                 )
                 transitions StateSet.empty 
                 in
                 (* We join with the other accesible states *) 
                 StateSet.union acc next_states
             ) 
-            states StateSet.empty 
+            choosen_states StateSet.empty 
             in
             let n_stack =
               (* We don't apply the function if
@@ -489,20 +490,20 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t
                   - or we already did the job
                   - or it's a loop
                *)
-              if StateSet.is_empty next_states || StateSetSet.mem next_states states_done || StateSet.compare next_states states = 0 then
+              if StateSet.is_empty next_states || StateSetSet.mem next_states states_done || StateSet.compare next_states choosen_states = 0 then
                 stack
               else
                 StateSetSet.add next_states stack
             in
-            (* We add the transitions labelled [letter] from [states] to [next_states], 
+            (* We add the transitions labelled [letter] from [choosen_states] to [next_states], 
                and we also return the new to_do_stack *)
             (letter, next_states) :: i_transitions, n_stack
         ) 
         automaton.alphabet ([], states_to_do) 
         in
-        let () = StateSetHashtbl.replace new_trans states i_transitions in
+        let () = StateSetHashtbl.replace new_trans choosen_states i_transitions in
         (* We keep_going the algo with the StateSet in the to_do list, and we add the current states to the done list since we just applied the algo to it*)
-        merge_transitions n_to_do @@ StateSetSet.add states states_done
+        merge_transitions n_to_do @@ StateSetSet.add choosen_states states_done
     in
     let () = merge_transitions states_to_do StateSetSet.empty in
     (* Renaming StateSet into a state 
