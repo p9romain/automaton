@@ -38,7 +38,7 @@ module type S = sig
   val check_word : t -> lt list -> bool
 
   val to_regex_my : t -> regexp
-  val to_regex_bm : t -> regexp
+  (* val to_regex_bm : t -> regexp *)
   (* val from_regex : regexp -> lt list -> t *)
 
 end
@@ -758,7 +758,7 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t
     )
     automaton.starts R.empty
 
-  let to_regex_bm (automaton: t) : regexp =
+(*   let to_regex_bm (automaton: t) : regexp =
     (* Only one start state (state nb = min - 1)*)
     let start_state = -1 + StateSet.fold min automaton.states 0
     in
@@ -795,6 +795,6 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t
     (* Add new end state *)
     let _automaton = add_end automaton end_state 
     in
-    R.letter Lt.epsilon
+    R.letter Lt.epsilon *)
 
 end

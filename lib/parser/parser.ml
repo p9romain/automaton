@@ -11,9 +11,10 @@ module S = struct
     s = epsilon
 
   let get (s : t) : symbol option =
-    match s with
-    | "EPS" -> None
-    | _ -> Some s
+    if is_epsilon s then
+      None
+    else
+      Some s
   let symbol (s : symbol) : t = s
 
 end
@@ -41,11 +42,17 @@ let parse_file (file_name : string) : string * A.t =
       with End_of_file ->
         close_in file
     in
-    let letters = List.map (
+    let letters_with_epsilon = List.map (
       fun (_, l, _ : int * string * int) : S.t ->
-        l (* implicit conversion because S.t is string *)
+        S.symbol l
     )
     !transitions
+    in
+    let letters = List.filter (
+      fun (l: S.t) : bool ->
+        not @@ S.is_epsilon l
+    ) 
+    letters_with_epsilon
     in
     let automaton = A.create letters in
     let states = ref [] in
