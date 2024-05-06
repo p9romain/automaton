@@ -145,6 +145,7 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
       | Letter _ -> r
       | Concat l ->
         let l = List.map simp l in
+        (* TODO : because of flattening, Bool;Int(Bool;Int)* isn't factored (we only check neighbours) *)
         let rec loop (l : t_ext list) : t_ext list =
           match l with
           | []
@@ -189,9 +190,20 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
           | l -> Concat l 
         )
       | Union l ->
-        let l = List.map simp l in
+        let unique_l = List.rev 
+          @@ List.fold_left (
+            fun (acc : t_ext list)
+                (r : t_ext) : t_ext list ->
+              if List.mem r acc then
+                acc
+              else
+                r :: acc
+          )
+          []
+          @@ List.map simp l
+        in
         (
-          match l with
+          match unique_l with
           | [] -> failwith "Empty union is impossible"
           | r :: [] -> r
           | _ -> (
@@ -201,17 +213,15 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
                 | Letter lt -> Lt.is_epsilon lt 
                 | _ -> false
             ) 
-            l
+            unique_l
             in
             match all_eps with 
-            | [] -> Union l (* no epsilon *)
+            | [] -> Union unique_l (* no epsilon *)
             | _ -> (* at least one *)
               match without_eps with
               | [] -> Letter Lt.epsilon (* it was an union of espilon (why not) *)
               | r :: [] -> simp @@ Option r
-              | _ -> 
-                let l = without_eps in
-                simp @@ Option (Union l)
+              | _ -> simp @@ Option (Union without_eps)
           )
         )
       | Star r ->
