@@ -190,8 +190,11 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
           | l -> Concat l 
         )
       | Union l ->
-        let unique_l = List.rev 
-          @@ List.fold_left (
+        let get_rid_of_duplicate (f : 'a list -> 'a -> 'a list)
+                                 (l : 'a list) =
+          List.rev @@ List.fold_left f [] l
+        in
+        let unique_l = get_rid_of_duplicate (
             fun (acc : t_ext list)
                 (r : t_ext) : t_ext list ->
               if List.mem r acc then
@@ -199,7 +202,6 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
               else
                 r :: acc
           )
-          []
           @@ List.map simp l
         in
         (
@@ -215,8 +217,109 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
             ) 
             unique_l
             in
+
+
+            (* NEED TO MEMOIZE *)
+
+            (* Returns the (prefixe of size len, what it is after) *)
+            let rec calc_prefixe_for_regexp (r : t_ext)
+                                            (len : int) : (t_ext * t_ext) option =
+              if len = 0 then
+                Some (Letter Lt.epsilon, Letter Lt.epsilon)
+              else
+                match r with
+                | Concat l -> (
+                  match l with
+                  | [] -> None
+                  | r :: next ->
+                    if len = 1 then
+                      Some (r, Concat next)
+                    else (
+                      match calc_prefixe_for_regexp (Concat next) @@ len - 1 with
+                      | None -> None
+                      | Some (r', next) -> 
+                        Some(
+                          Concat ([
+                            r ;
+                            r'
+                          ]),
+                          next
+                        )
+                    )
+                )
+                | Plus r ->
+                  if len = 1 then
+                    Some r
+                  else (
+                    match calc_prefixe_for_regexp (Star r) @@ len - 1 with
+                    | None -> None
+                    | Some (r', next) -> 
+                      Some(
+                        Concat ([
+                          r ;
+                          r'
+                        ]),
+                        next
+                      )
+                  )
+                | _ ->
+                  if len = 1 then
+                    Some (r, Letter Lt.epsilon)
+                  else
+                    None
+            in
+            (* Calculates all the prefixe of size len for an union *)
+            let calc_all_prefixes_for_union (l : t_ext list)
+                                            (len : int) : (t_ext * t_ext) option list =
+              List.fold_left (
+                fun (acc : (t_ext * t_ext) option list)
+                    (r: t_ext) : (t_ext * t_ext) option list ->
+                  (calc_prefixe_for_regexp r len) :: acc 
+              )
+              [] l
+            in
+            (* Search the greatest prefixe for an union, and then factorize it
+               (rr'|rr'') = r(r'|r'')
+             *)
+            (* let factorize (l : t_ext list) : t_ext =
+              let max_not_found = ref true in
+              let len = ref 0 in
+              let cur = ref @@ calc_all_prefixes_for_union l !len in
+              let max = ref @@ calc_all_prefixes_for_union l !len in
+              let max_prefix = ref @@ Letter Lt.epsilon in
+              let () =
+                while !max_not_found do
+                  let all_none, without_none = List.partition Option.is_none !max in
+                  match without_none with
+                  | [] -> max_not_found := false
+                  | _ -> (
+                    let () = len := !len + 1 in
+                    match all_none with
+                    | [] ->
+                      let f l x = l in
+                      match get_rid_of_duplicate f !max with
+                      | [] -> assert false
+                      | r :: [] ->
+
+
+
+                      (* NEED TO CHECK IF ITS THE SAME PREFIX FOR ALL *)
+                      max := calc_all_prefixes_for_union l !len
+                    | _ -> ()
+                  ) 
+                done
+              in
+              Concat ( 
+                List.cons !max_prefix 
+                @@ List.map (
+                    fun (cant_be_none : (t_ext * t_ext) option) : t_ext ->
+                    snd @@ Option.get cant_be_none
+                  ) 
+                  !max 
+              )
+            in  *)
             match all_eps with 
-            | [] -> Union unique_l (* no epsilon *)
+            | [] -> Union without_eps (* no epsilon *)
             | _ -> (* at least one *)
               match without_eps with
               | [] -> Letter Lt.epsilon (* it was an union of espilon (why not) *)
