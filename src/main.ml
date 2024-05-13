@@ -37,9 +37,9 @@ let () = Printf.printf "NFA (simplified) : %s\n" @@ R.(to_string @@ simplify @@ 
 let () = Printf.printf "DFA : %s\n" @@ R.(to_string @@ simp_to_ext regexp_of_dfa)
 let () = Printf.printf "DFA (simplified) : %s\n" @@ R.(to_string @@ simplify @@ simp_to_ext regexp_of_dfa)
 
-let () = Printf.printf "\n\n\n"
+(* let () = Printf.printf "\n\n\n"
 
-(* let () = 
+let () = 
   for i = 0 to 8 do
     let (regexp, nfa) = Parser.parse_file (Printf.sprintf "test/auto00%d.txt" i) in
     let () = A.to_dot nfa (Printf.sprintf "test/nfa_%d" i) in
