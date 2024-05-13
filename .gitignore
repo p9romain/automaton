@@ -2,4 +2,5 @@ build
 .data
 _*
 doc
-node_modules
+*node_modules
+automaton.opam
