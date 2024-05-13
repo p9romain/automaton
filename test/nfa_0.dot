@@ -1,9 +1,0 @@
-digraph automaton
-{
-  __INVISIBLE_NODE_0__ [label= "", shape=none,height=.0,width=.0] ;
-  __INVISIBLE_NODE_0__ -> 0 ;
-  3 [peripheries=2] ;
-  0 -> 1 [label="`A"] ;
-  1 -> 2 [label="`B"] ;
-  2 -> 3 [label="`C"] ;
-}
