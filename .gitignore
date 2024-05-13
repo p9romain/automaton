@@ -1,6 +1,7 @@
 build
 .data
 _*
+
 doc
 *node_modules
 automaton.opam
