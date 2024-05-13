@@ -9,6 +9,9 @@ module type Symbol = sig
   (* [to_string s] cast the symbol [s] into a string *)
   val to_string : t -> string
 
+  (* Gives us a sample of a symbol, useful or tests *)
+  val sample : t
+
 end
 
 module type Letter = sig
@@ -24,10 +27,13 @@ module type Letter = sig
   (* [to_string l] casts the letter [l] into a string *)
   val to_string : t -> string
 
-  (* The epslon value *)
+  (* The epislon value *)
   val epsilon : t
   (* [is_epsilon l] checks if [l] is epsilon *)
   val is_epsilon : t -> bool
+
+  (* Gives us a sample of a letter, useful or tests *)
+  val sample : t
 
   (* [get l] returns the correponding symbol in the letter [l] : if it's epsilon,
       it returns [None], otherwise it returns [Some s], where [s] is the associated symbol *)

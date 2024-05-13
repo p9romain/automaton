@@ -5,6 +5,8 @@ module type Symbol = sig
   val compare : t -> t -> int
   val to_string : t -> string
 
+  val sample : t
+
 end
 
 module type Letter = sig
@@ -17,6 +19,8 @@ module type Letter = sig
 
   val epsilon : t
   val is_epsilon : t -> bool
+
+  val sample : t
 
   val get : t -> symbol option
   val symbol : symbol -> t
@@ -50,4 +54,6 @@ module AddEpsilon(Sym : Symbol) : Letter with type symbol = Sym.t = struct
   let get (letter : t) : symbol option = letter
   let symbol (s : symbol) : t = Some s
 
+  let sample = symbol Sym.sample
+  
 end

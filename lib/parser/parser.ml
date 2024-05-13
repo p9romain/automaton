@@ -10,6 +10,8 @@ module S = struct
   let is_epsilon (s : t) : bool = 
     s = epsilon
 
+  let sample = "a"
+
   let get (s : t) : symbol option =
     if is_epsilon s then
       None
