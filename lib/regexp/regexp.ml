@@ -216,13 +216,7 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
             unique_l
             in
 
-            (* TODO : FACTORIZE [FACTORIZE] *)
-
-
-            (* Returns the prefix and what it comes next 
-
-                (prefix, next)
-            *)
+            (* Returns the prefix and what it comes next *)
             let calc_prefix (r : t_ext) : t_ext option * t_ext option =
               match r with
               | Concat l -> (
@@ -233,116 +227,97 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
               | Plus r -> Some r, Some (Star r)
               | _ -> Some r, None
             in
-            (* Returns the suffix and what it comes before 
-
-                (before, suffix)
-            *)
+            (* Returns the suffix and what it comes before *)
             let rec calc_suffix (r : t_ext) : t_ext option * t_ext option =
               match r with
               | Concat l -> (
                 match l with
                 | [] -> None, None
-                | r :: [] -> None, Some r
+                | r :: [] -> Some r, None 
                 | r' :: next -> 
-                  let (before, suff) = calc_suffix @@ Concat next in
+                  let (suff, before) = calc_suffix @@ Concat next in
                   match before with
-                  | None -> Some r', suff
-                  | Some before -> Some (flatten @@ Concat [r'; before]), suff
+                  | None -> suff, Some r'
+                  | Some before -> suff, Some (flatten @@ Concat [r'; before])
               )
-              | Plus r -> Some r, Some (Star r)
-              | _ -> None, Some r
+              | Plus r -> Some (Star r), Some r
+              | _ -> Some r, None
             in
             (* Factorize 
 
                 The boolean tells us if we can simplify the result, i.e
                   it has been factorized, thus changed (it prevents 
-                  looping infinitely)
+                  looping infinitely when simplifying the new expression)
             *)
             let factorize (r : t_ext) : t_ext * bool =
-              let factorize_prefix (r : t_ext) : t_ext * bool =
+              let aux (r : t_ext)
+                      (calc : t_ext -> t_ext option * t_ext option)
+                      (concat_factors : t_ext -> t_ext -> t_ext)
+                      (factorize : t_ext -> t_ext list -> t_ext) : t_ext * bool =
                 match r with
                 | Union l ->
-                  (* greatest common prefix found *)
-                  let max_pref = ref None in
-                  (* list of all regexp without the common prefix *)
-                  let max_next = ref l in
-                  let prefix_not_found = ref true in
+                  (* list of all regexp without the common factor *)
+                  let max_left = ref l in
+                  (* greatest common factor found *)
+                  let max_factor = ref None in
+                  let factor_not_found = ref true in
                   let has_been_factorized = ref false in
                   let () =
-                    while !prefix_not_found do
-                      let all_prefixes, all_next = List.split
-                        @@ List.map calc_prefix !max_next
+                    while !factor_not_found do
+                      let all_factors, all_left = List.split
+                        @@ List.map calc !max_left
                       in
-                      match get_rid_of_duplicate all_prefixes with
-                      | [] -> assert false (* No prefix : issue *)
-                      | Some pref :: [] -> (
+                      match get_rid_of_duplicate all_factors with
+                      | [] -> assert false (* No factor : issue *)
+                      | Some factor :: [] -> (
                         has_been_factorized := true ;
-                        max_next := List.map (
-                          fun (next : t_ext option) : t_ext ->
-                            match next with
+                        max_left := List.map (
+                          fun (left : t_ext option) : t_ext ->
+                            match left with
                             | None -> Letter Lt.epsilon
                             | Some r -> r
                         )
-                        all_next ;
-                        match !max_pref with
-                        | None -> max_pref := Some pref
-                        | Some old_pref -> 
-                          max_pref := Some (Concat [ old_pref; pref ])
+                        all_left ;
+                        match !max_factor with
+                        | None -> max_factor := Some factor    
+                        | Some old_factor -> 
+                          max_factor := Some (concat_factors old_factor factor)
                       )
-                      | None :: [] (* No prefix found *)
-                      | _ -> prefix_not_found := false (* More than one prefix *)
+                      | None :: [] (* No factor found *)
+                      | _ -> factor_not_found := false (* More than one factor *)
                     done
                   in 
                   (
-                    match !max_pref with
+                    match !max_factor with
                     | None -> r, false
-                    | Some prefix -> Concat [ prefix; Union !max_next ], !has_been_factorized
+                    | Some factor -> factorize factor !max_left, !has_been_factorized
                   )
                 | _ -> r, false
               in
-              let factorize_suffix (r : t_ext) : t_ext * bool =
-                match r with
-                | Union l ->
-                  (* list of all regexp without the common suffix *)
-                  let max_before = ref l in
-                  (* greatest common suffix found *)
-                  let max_suff = ref None in
-                  let suffix_not_found = ref true in
-                  let has_been_factorized = ref false in
-                  let () =
-                    while !suffix_not_found do
-                      let all_before, all_suffixes = List.split
-                        @@ List.map calc_suffix !max_before
-                      in
-                      match get_rid_of_duplicate all_suffixes with
-                      | [] -> assert false (* No suffix : issue *)
-                      | Some suff :: [] -> (
-                        has_been_factorized := true ;
-                        max_before := List.map (
-                          fun (before : t_ext option) : t_ext ->
-                            match before with
-                            | None -> Letter Lt.epsilon
-                            | Some r -> r
-                        )
-                        all_before ;
-                        match !max_suff with
-                        | None -> max_suff := Some suff
-                        | Some old_suff -> 
-                          max_suff := Some (Concat [ suff; old_suff ])
-                      )
-                      | None :: [] (* No suffix found *)
-                      | _ -> suffix_not_found := false (* More than one suffix *)
-                    done
-                  in 
-                  (
-                    match !max_suff with
-                    | None -> r, false
-                    | Some suffix -> Concat [ Union !max_before; suffix ], !has_been_factorized
-                  )
-                | _ -> r, false
+              let r, is_factorized = aux r calc_prefix
+              (
+                fun (old_factor : t_ext)
+                    (factor : t_ext) : t_ext ->
+                  Concat [ old_factor ; factor ]
+              )
+              (
+                fun (prefix : t_ext)
+                    (left : t_ext list) : t_ext ->
+                  Concat [ prefix; Union left ]
+              )
               in
-              let r, is_factorized = factorize_prefix r in
-              let r, is_factorized' = factorize_suffix r in
+              let r, is_factorized' =  aux r calc_suffix
+              (
+                fun (old_factor : t_ext)
+                    (factor : t_ext) : t_ext ->
+                  Concat [ factor ; old_factor ]
+              )
+              (
+                fun (suffix : t_ext)
+                    (left : t_ext list) : t_ext ->
+                  Concat [ Union left; suffix ]
+              )
+              in
               r, is_factorized || is_factorized'
             in
             match all_eps with 
