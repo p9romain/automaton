@@ -135,7 +135,7 @@ module Make (Lt : Letter.Letter) : S with type lt = Lt.t = struct
           | _ -> "(" ^ loop r ^ ")?"
         )
     in
-    loop r
+    loop @@ flatten r
 
 
   let get_rid_of_duplicate (l : 'a list) : 'a list =

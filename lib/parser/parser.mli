@@ -1,5 +1,6 @@
 (* the Letter module : just a string type *)
-module S : Letter.Letter with type symbol = string
+module S : Letter.Letter with type symbol = string 
+                          and type t = string
 
 (* the Automaton module *)
 module A : Automaton.S with type lt = S.t
